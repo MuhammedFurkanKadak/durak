@@ -240,15 +240,16 @@ const FASTT=new Set(["metro","marmaray","tramvay","vapur","metrobus","funikuler"
 let FAST={};
 // Erişim durakları: yakındakilerin hepsi, uzaktakilerden sadece hızlı hat durakları
 // Durak adı seçildiyse: o addaki duraklar (yürümesiz) + her birinin 500 m çevresindeki duraklar (yürüyerek)
-function groupAccess(ids){
+function groupAccess(ids,R){
   const m={}; ids.forEach(id=>m[id]=0);
-  ids.forEach(id=>near(STOPS[id].p,500).forEach(({id:j,d})=>{ if(m[j]===undefined||d<m[j]) m[j]=d; }));
+  ids.forEach(id=>near(STOPS[id].p,R||500).forEach(({id:j,d})=>{ if(m[j]===undefined||d<m[j]) m[j]=d; }));
   return Object.entries(m).map(([id,d])=>({id,d}));
 }
 // r: yavaş hat (otobüs, minibüs) durakları için yürüme sınırı, fr: hızlı hat durakları için
 function access(p,r,fr){
   fr=Math.max(fr||r,r); const all=near(p,fr), out=[]; let slow=0;
-  for(const x of all){ if(FAST[x.id]||(x.d<=r&&slow++<120)) out.push(x); }
+  const cap=r>900?400:120;
+  for(const x of all){ if(FAST[x.id]||(x.d<=r&&slow++<cap)) out.push(x); }
   return out;
 }
 const nearStop=(id,r)=>nearCache[id+"/"+r]||(nearCache[id+"/"+r]=near(STOPS[id].p,r));
@@ -463,12 +464,13 @@ function buildIndex(){
     x.si.forEach((s,pos)=>{ (IDXI[s]||(IDXI[s]=[])).push(li*1000+di, pos); }); }));
 }
 const xferCache=[];
-function xferOf(s,R){ const c=xferCache[s]; if(c&&c.R===R) return c.v;
+// full: gece/seyrek durumlar için menzildeki tüm duraklar
+function xferOf(s,R,full){ const key=full?"f"+R:R, c=xferCache[s]; if(c&&c.R===key) return c.v;
   // en yakın 25 durak + menzildeki tüm hızlı hat (raylı, vapur, metrobüs) durakları
-  let slow=0; const v=nearStop(IS[s],R).filter(x=>x.id!==IS[s]&&(FAST[x.id]||slow++<25)).map(x=>[SI[x.id],x.d,walkMin(x.d)]); xferCache[s]={R,v}; return v; }
+  let slow=0; const v=nearStop(IS[s],R).filter(x=>x.id!==IS[s]&&(full||FAST[x.id]||slow++<25)).map(x=>[SI[x.id],x.d,walkMin(x.d)]); xferCache[s]={R:key,v}; return v; }
 function raptor(origins,dests,t0,banned,opt){
   if(!SI) buildIndex();
-  const MAX_LEGS=(opt&&opt.legs)||6, XFER_R=(opt&&opt.xfer)||700, HOR=(opt&&opt.hor)||180, INF=1e9;
+  const MAX_LEGS=(opt&&opt.legs)||6, XFER_R=(opt&&opt.xfer)||800, HOR=(opt&&opt.hor)||180, INF=1e9;
   const best=new Float64Array(NSTOP).fill(INF), pT=new Float64Array(NSTOP).fill(INF), pK=new Int8Array(NSTOP);
   const dmap=new Float64Array(NSTOP).fill(-1), dlist=[];
   dests.forEach(({id,d})=>{ const s=SI[id]; if(s===undefined) return; const w=walkMin(d); if(dmap[s]<0||w<dmap[s]){ if(dmap[s]<0) dlist.push(s); dmap[s]=w; } });
@@ -505,7 +507,7 @@ function raptor(origins,dests,t0,banned,opt){
     // Aktarma yürüyüşleri (araçtan inilen duraklardan yakındaki duraklara)
     const rides=marked.slice();
     for(const s of rides){ const L=Lk.get(s); if(!L||L.wk) continue;
-      for(const [id,d,w] of xferOf(s,XFER_R)){ const t=L.t+w+1;
+      for(const [id,d,w] of xferOf(s,XFER_R,opt&&opt.full)){ const t=L.t+w+1;
         if(t<best[id]&&t<bestT){ best[id]=t; upd(id,t); Lk.set(id,{t,wk:true,from:s,m:Math.round(d),ride:L}); if(!mflag[id]){mflag[id]=1;marked.push(id);} } } }
     for(const s of marked){ pT[s]=Lk.get(s).t; pK[s]=k; }
     // Bu turun en iyi varışı
@@ -529,38 +531,39 @@ function rebuild(lab,k,s,arr,dmap,dests){
   return {legs,w1,w2,arr};
 }
 // Seçeneğin ölçütleri: varış, araç sayısı, toplam yürüme
+// Ölçütler: çıkış (evden tam zamanında), varış, süre, araç sayısı, yürüme
 function metrics(o){
-  if(o.walk) return {arr:o.arr,legs:0,walk:o.m};
-  return {arr:o.arr,legs:o.legs.length,walk:o.w1.m+o.w2.m+o.legs.reduce((s,l)=>s+(l.tw||0),0)};
+  if(o.walk){ const lv=nowMin(); return {leave:lv,arr:o.arr,dur:o.arr-lv,legs:0,walk:o.m}; }
+  const leave=o.legs[0].board-o.w1.w-1;
+  return {leave,arr:o.arr,dur:o.arr-leave,legs:o.legs.length,walk:o.w1.m+o.w2.m+o.legs.reduce((s,l)=>s+(l.tw||0),0)};
 }
 const planKey=o=>o.walk?"walk":o.legs.map(l=>l.li).join(">")+"@"+Math.round(o.legs[0].board);
 // Seçenekleri sırala: Pareto (her açıdan daha kötüsü olmayanlar) önce, etiketli
+// Sıralama: yolculuk süresine göre (evden çıkıştan varışa). Her açıdan daha kötü olanlar (süre, aktarma, yürüme) elenir.
 function rank(all,now,limit){
   const byKey={};
-  all.forEach(o=>{ o.mt=o.mt||metrics(o); const k=planKey(o); const q=byKey[k]; if(!q||o.mt.walk<q.mt.walk) byKey[k]=o; });
-  const cand=Object.values(byKey).filter(o=>o.mt.arr-now<300&&o.mt.walk<6000)
-    .sort((a,b)=>a.mt.arr-b.mt.arr||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
+  // Aynı hat dizisi: en kısa süreni, eşitse en erken çıkanı tut
+  all.forEach(o=>{ o.mt=metrics(o); const k=o.walk?"walk":o.legs.map(l=>l.li).join(">"); const q=byKey[k];
+    if(!q||o.mt.dur<q.mt.dur-1||(Math.abs(o.mt.dur-q.mt.dur)<=1&&o.mt.leave<q.mt.leave)) byKey[k]=o; });
+  const cand=Object.values(byKey).filter(o=>o.mt.leave>=now-1&&o.mt.leave-now<=480&&o.mt.walk<6000)
+    .sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
   const kept=[], other=[];
   for(const o of cand){
     o.tags=[];
-    (kept.some(q=>q.mt.arr<=o.mt.arr+3&&q.mt.legs<=o.mt.legs&&q.mt.walk<=o.mt.walk+150)?other:kept).push(o);
+    (kept.some(q=>q.mt.dur<=o.mt.dur+3&&q.mt.arr<=o.mt.arr+3&&q.mt.legs<=o.mt.legs&&q.mt.walk<=o.mt.walk+150)?other:kept).push(o);
   }
-  const tag=(f,label)=>{ if(!kept.length) return; const v=Math.min(...kept.map(f)); kept.filter(o=>f(o)===v).sort((a,b)=>a.mt.arr-b.mt.arr)[0].tags.push(label); };
-  tag(o=>o.mt.arr,"En hızlı");
-  if(kept.length>1){ tag(o=>o.walk?99:o.mt.legs,"En az aktarma"); tag(o=>o.mt.walk,"En az yürüme"); }
+  const tag=(f,label)=>{ if(!kept.length) return; const v=Math.min(...kept.map(f)); kept.filter(o=>f(o)===v).sort((a,b)=>a.mt.dur-b.mt.dur)[0].tags.push(label); };
+  tag(o=>o.mt.dur,"En kısa");
+  if(kept.length>1){ tag(o=>o.mt.arr,"En erken varış"); tag(o=>o.walk?99:o.mt.legs,"En az aktarma"); tag(o=>o.mt.walk,"En az yürüme"); }
   const tagged=kept.filter(o=>o.tags.length), rest=kept.filter(o=>!o.tags.length);
   let top=[...tagged,...rest].slice(0,5);
-  // Liste kısa kaldıysa makul alternatiflerle doldur: en hızlıdan en fazla 30 dk geç, en az aktarmadan en fazla 1 fazla aktarma, farklı ilk hat
-  if(top.length<5&&kept.length){
-    const fastest=Math.min(...kept.map(o=>o.mt.arr)), minLegs=Math.min(...kept.map(o=>o.mt.legs||9));
-    const firsts=new Set(top.filter(o=>!o.walk).map(o=>o.legs[0].li+"/"+(o.legs[1]?o.legs[1].li:"")));
+  if(top.length<5){
+    const best=Math.min(...cand.map(o=>o.mt.dur)), firsts=new Set(top.filter(o=>!o.walk).map(o=>o.legs[0].li));
     for(const o of other){ if(top.length>=5) break;
-      if(o.walk||o.mt.arr>fastest+30||o.mt.legs>minLegs+1) continue;
-      const k=o.legs[0].li+"/"+(o.legs[1]?o.legs[1].li:""); if(firsts.has(k)) continue;
-      firsts.add(k); top.push(o); }
+      if(o.walk||o.mt.dur>best+30||firsts.has(o.legs[0].li)) continue; firsts.add(o.legs[0].li); top.push(o); }
   }
-  top.sort((a,b)=>a.mt.arr-b.mt.arr);
-  const more=[...kept.filter(o=>!top.includes(o)),...other].sort((a,b)=>a.mt.arr-b.mt.arr);
+  top.sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave);
+  const more=[...kept.filter(o=>!top.includes(o)),...other].sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave);
   return {top,more:more.slice(0,limit-top.length)};
 }
 // Aktarmasız giden tüm hatlar: başlangıç durağından binip varış durağında inilebilen her hat-yön için sıradaki sefer
@@ -577,7 +580,7 @@ function directLines(O,Dn,now){
       if(!best[k]||arr<best[k].arr) best[k]={legs:[{li,di,from:pos,to:e.pos,board:b,tw:0}],w1:{sid:id,m:Math.round(d),w:w1},w2:{sid:e.id,m:Math.round(e.d),w:walkMin(e.d)},arr};
     });
   }));
-  return Object.values(best).map(o=>(o.mt=metrics(o),o.tags=[],o)).sort((a,b)=>a.legs[0].board-b.legs[0].board).slice(0,20);
+  return Object.values(best).map(o=>(o.mt=metrics(o),o.tags=[],o)).sort((a,b)=>a.legs[0].board-b.legs[0].board).slice(0,40);
 }
 // Hızlı arama: birkaç yürüme sınırı + ana hat yasaklı tekrar
 function plan(A,B,Aids,Bids){
@@ -598,8 +601,21 @@ function plan(A,B,Aids,Bids){
       cur=raptor(O,Dn,now,new Set(ban)); all.push(...cur);
     }
   }
+  // Sonuç yoksa ya da çok uzun sürüyorsa (gece, seyrek hatlar): 1,5 km'ye kadar her durağa yürüyerek geniş ara
+  { const bestNow=Math.min(...all.filter(o=>!o.walk).map(o=>o.arr),1e9);
+    if(bestNow>now+60){
+      const O=Aids?groupAccess(Aids,1200):access(A,1500,1500), Dn=Bids?groupAccess(Bids,1200):access(B,1500,1500);
+      all.push(...raptor(O,Dn,now,null,{hor:300,full:true}));
+    } }
+  // Sonraki çıkış saatleri: şimdi değil biraz sonra çıkınca daha kısa süren yollar (Moovit gibi)
+  { const hh=now%1440, O=Aids?groupAccess(Aids):access(A,600,1500), Dn=Bids?groupAccess(Bids):access(B,600,1500);
+    // Gece ya da şu an makul sefer yoksa: sonraki çıkışlar ve sabah ilk seferleri (05:00–06:30)
+    const soon=all.some(o=>!o.walk&&o.legs[0].board-now<=60), starts=[];
+    if(hh<300||!soon){ starts.push(now+30,now+60,now+120); if(hh<300) [300,330,360,390].forEach(t=>starts.push(now-hh+t)); }
+    for(const t0 of starts) all.push(...raptor(O,Dn,t0,null,{hor:120}).filter(o=>o.legs[0].board>=t0));
+  }
   M.found=all;
-  { const O=Aids?groupAccess(Aids):access(A,600,900), Dn=Bids?groupAccess(Bids):access(B,600,900); M.direct=directLines(O,Dn,now); }
+  { const O=Aids?groupAccess(Aids):near(A,900), Dn=Bids?groupAccess(Bids):near(B,900); M.direct=directLines(O,Dn,now); }
   return rank(all,now,5).top;
 }
 // Geniş arama: 2,5 km yürüme, 800 m aktarma, 6 araç, bulunan her hattı yasaklayıp tekrar, sonraki kalkışlar
@@ -652,12 +668,13 @@ function steps(o){
   const now=nowMin(), out=[];
   if(o.walk){ out.push({k:"walk",from:M.A,to:M.B,m:o.m,dk:walkMin(o.m),t:now,txt:"Varış noktasına yürü"}); return out; }
   const p=s=>STOPS[s].p;
-  out.push({k:"walk",from:o.w1.m?M.A:p(o.w1.sid),to:p(o.w1.sid),m:o.w1.m,dk:o.w1.w,t:now,txt:`${STOPS[o.w1.sid].n} durağına yürü`});
+  const leave=(o.mt||metrics(o)).leave;
+  out.push({k:"walk",from:o.w1.m?M.A:p(o.w1.sid),to:p(o.w1.sid),m:o.w1.m,dk:o.w1.w,t:leave,txt:`${STOPS[o.w1.sid].n} durağına yürü`});
   o.legs.forEach((g,i)=>{
     const Ln=LINES[g.li], x=Ln.dir[g.di], off=x.o[g.to]-x.o[g.from];
     if(i>0){ const pg=o.legs[i-1], px=LINES[pg.li].dir[pg.di];
       out.push({k:"walk",from:p(px.s[pg.to]),to:p(x.s[g.from]),m:g.tw,dk:g.tw?walkMin(g.tw):0,t:pg.board+(px.o[pg.to]-px.o[pg.from]),txt:`Aktarma: ${STOPS[x.s[g.from]].n} durağına yürü`}); }
-    const prevEnd=out.length?(out[out.length-1].t+(out[out.length-1].dk||0)):now;
+    const prevEnd=out.length?(out[out.length-1].t+(out[out.length-1].dk||0)):leave;
     out.push({k:"ride",Ln,x,g,t:g.board,end:g.board+off,dk:Math.round(off),first:i===0,bekle:Math.max(0,Math.round(g.board-prevEnd)),
       on:STOPS[x.s[g.from]].n, off:STOPS[x.s[g.to]].n, yon:x.h||STOPS[x.s[x.s.length-1]].n,
       ara:x.s.slice(g.from+1,g.to).map(s=>STOPS[s].n)});
@@ -668,6 +685,16 @@ function steps(o){
 }
 const chain=o=>steps(o).map(s=>s.k==="walk"?(s.m>40?`<span class="w">🚶${s.dk}</span>`:""):`<span class="cb" style="background:${lc(s.Ln)}">${esc(s.Ln.b)}</span>`).filter(Boolean).join(`<span class="sep">›</span>`);
 
+// Kısa, tıklanabilir seçenek kartları
+function planCard(o,k,now){
+  const mt=o.mt||metrics(o), first=o.legs?o.legs[0]:null;
+  const leaveTxt=mt.leave-now<=1?"Hemen çık":`Çıkış ${fmt(mt.leave)} · ${dk(mt.leave-now)} sonra`;
+  const sub=o.walk?`${o.m} m yürüyüş`:`${leaveTxt} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)}`;
+  const tg=(o.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
+  const meta=o.walk?"":` · 🚶 ${mt.walk>=1000?(mt.walk/1000).toFixed(1)+" km":mt.walk+" m"}`;
+  return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o)}</div><div class="sub">${sub}${meta}</div></div>
+    <div class="dur">${dkBig(mt.dur)}<span>${fmt(mt.leave)}–${fmt(o.arr)}</span></div><span class="chev">›</span></div>`;
+}
 // Kısa, tıklanabilir seçenek kartları
 function planCard(o,k,now){
   const first=o.legs?o.legs[0]:null, dur=Math.round(o.arr-now);
@@ -738,12 +765,12 @@ function openPlan(k){
   try{ map.fitBounds(L.featureGroup(routeLayer.getLayers().concat([mkA,mkB].filter(Boolean))).getBounds().pad(.12)); }catch(e){}
   drawVehicles();
   const d=document.getElementById("detail");
-  d.innerHTML=`    <div class="dhead"><div><div class="chain">${chain(o)}</div><div class="sub">${esc(M.Aname)} → ${esc(M.Bname)}</div></div><div class="dur">${dkBig(o.arr-now)}<span>varış ${fmt(o.arr)}</span></div></div>
-    <div class="steps">${ss.map(s=>s.k==="walk"?(s.m>5?`
+  d.innerHTML=`    <div class="dhead"><div><div class="chain">${chain(o)}</div><div class="sub">${esc(M.Aname)} → ${esc(M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>çıkış ${fmt((o.mt||metrics(o)).leave)} · varış ${fmt(o.arr)}</span></div></div>
+    <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname||"Başlangıç")}</b><span>${(o.mt||metrics(o)).leave-now<=1?"Hemen yola çık":"Yola çık: "+fmt((o.mt||metrics(o)).leave)+" ("+dk((o.mt||metrics(o)).leave-now)+" sonra)"}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
       <div class="step s-walk"><div class="ic"><span>🚶</span></div><div class="tx"><b>${esc(s.txt)}</b><span data-wk="${s.from.join()+";"+s.to.join()}">${s.m} m · ~${dk(s.dk)}</span></div><div class="tm"></div></div>`:""):`
       <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb" style="background:${lc(s.Ln)}">${esc(s.Ln.b)}</span></div>
         <div class="tx"><b>Bin: ${esc(s.on)}</b><span>${esc(s.yon)} yönü · ${esc(s.Ln.n)}</span>
-          <span class="wait">${s.first?(inMin(s.t)==="Şimdi"?"Şimdi kalkıyor":inMin(s.t)+" sonra kalkıyor"):(s.bekle?s.bekle+" dk bekleme":"Hemen aktarma")} · tarifeye göre</span>
+          <span class="wait">${s.first?(s.t-now<=1?"Şimdi kalkıyor":`${fmt(s.t)}'de kalkıyor (${dk(s.t-now)} sonra)`):(s.bekle?dk(s.bekle)+" bekleme":"Hemen aktarma")} · tarifeye göre</span>
           ${s.ara.length?`<details><summary>${s.ara.length+1} durak · ~${dk(s.dk)}</summary><div class="ara">${s.ara.map(esc).join(" · ")}</div></details>`:`<span>1 durak · ~${dk(s.dk)}</span>`}
           <b style="margin-top:6px">İn: ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
