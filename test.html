@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Durak – Veri Testi</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#f6f5f1;color:#15171a;margin:0;padding:20px}
+.wrap{max-width:720px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}
+p{color:#6b7078;margin:0 0 16px;font-size:14px}
+button{font:inherit;font-weight:700;border:none;border-radius:12px;padding:12px 18px;background:#f2b300;color:#1a1400;cursor:pointer;margin-bottom:16px}
+.t{background:#fff;border:1px solid #e6e3dc;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.t b{font-size:15px}
+.t .s{float:right;font-weight:700}
+pre{white-space:pre-wrap;word-break:break-all;font-size:11.5px;background:#f6f5f1;border-radius:8px;padding:8px;max-height:140px;overflow:auto;margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Durak – Veri Testi</h1>
+  <p>İBB/İETT servislerinden hangilerinin çalıştığını kontrol eder. "Hepsini test et"e bas, bitince ekran görüntüsünü Claude'a gönder.</p>
+  <button id="go">Hepsini test et</button>
+  <div id="out"></div>
+</div>
+<script>
+const TESTS = [
+  ["Hat bilgisi (500T)", "HatDurakGuzergah", "GetHat_json", {HatKodu:"500T"}],
+  ["Durak bilgisi", "HatDurakGuzergah", "GetDurak_json", {DurakKodu:"106032"}],
+  ["Hattın durakları (500T)", "ibb", "DurakDetay_GYY", {hat_kodu:"500T"}],
+  ["Sefer saatleri (500T)", "PlanlananSeferSaati", "GetPlanlananSeferSaati_json", {HatKodu:"500T"}],
+  ["CANLI otobüs konumu (500T)", "SeferGerceklesme", "GetHatOtoKonum_json", {HatKodu:"500T"}],
+  ["Duyurular", "Duyurular", "GetDuyurular_json", {}],
+];
+const out = document.getElementById("out");
+document.getElementById("go").onclick = async () => {
+  out.innerHTML = "";
+  for (const [ad, svc, m, p] of TESTS) {
+    const box = document.createElement("div");
+    box.className = "t";
+    box.innerHTML = `<span class="s">⏳</span><b></b><pre>Bekleniyor…</pre>`;
+    box.querySelector("b").textContent = ad;
+    out.appendChild(box);
+    const q = new URLSearchParams({svc, m, ...p});
+    const t0 = performance.now();
+    try {
+      const r = await fetch("/api/iett?" + q);
+      const j = await r.json();
+      const ms = Math.round(performance.now() - t0);
+      const n = Array.isArray(j.data) ? ` · ${j.data.length} kayıt` : "";
+      box.querySelector(".s").textContent = j.ok ? `✅ ${ms} ms${n}` : "❌";
+      box.querySelector("pre").textContent = JSON.stringify(j.ok ? j.data : j).slice(0, 500);
+    } catch (e) {
+      box.querySelector(".s").textContent = "❌";
+      box.querySelector("pre").textContent = String(e);
+    }
+  }
+};
+</script>
+</body>
+</html>
