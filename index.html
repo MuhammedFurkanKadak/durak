@@ -150,7 +150,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
     <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="12" rx="3" fill="#1a1400"/><rect x="7" y="6" width="10" height="4" rx="1" fill="#f2b300"/><circle cx="8" cy="12.5" r="1" fill="#f2b300"/><circle cx="16" cy="12.5" r="1" fill="#f2b300"/><rect x="11" y="15" width="2" height="7" rx="1" fill="#1a1400"/></svg></div>
     <div><h1>Durak</h1><small>İstanbul toplu taşıma · reklamsız</small></div>
   </header>
-  <div class="note">Veri: İBB Açık Veri (metro, Marmaray, tramvay, vapur, minibüs, dolmuş). Saatler tarifeye göredir, araç konumları tahminidir. İETT otobüs ve metrobüs yakında.</div>
+  <div class="note">Veri: İBB Açık Veri (İETT otobüs ve metrobüs, metro, Marmaray, tramvay, vapur, minibüs, dolmuş). Saatler tarifeye göredir, araç konumları tahminidir.</div>
   <main id="app"><div class="loading">Hatlar yükleniyor…</div></main>
   <section id="mapview" hidden>
     <div id="rsearch">
@@ -183,12 +183,12 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 const TYPES = {
   metro:{ad:"Metro",c:"#d62828"}, marmaray:{ad:"Marmaray",c:"#e07a00"}, tramvay:{ad:"Tramvay",c:"#0b8a5c"},
   vapur:{ad:"Vapur",c:"#0077b6"}, minibus:{ad:"Minibüs",c:"#2a9d8f"}, dolmus:{ad:"Dolmuş",c:"#8d5524"},
-  funikuler:{ad:"Füniküler",c:"#6d597a"}, teleferik:{ad:"Teleferik",c:"#457b9d"}, otobus:{ad:"Otobüs",c:"#1f6feb"}, "raylı":{ad:"Raylı",c:"#e07a00"}
+  funikuler:{ad:"Füniküler",c:"#6d597a"}, teleferik:{ad:"Teleferik",c:"#457b9d"}, otobus:{ad:"Otobüs",c:"#1f6feb"}, metrobus:{ad:"Metrobüs",c:"#7b2cbf"}, "raylı":{ad:"Raylı",c:"#e07a00"}
 };
 const METRO_C = {M1A:"#e2231a",M1B:"#e2231a",M2:"#009b48",M2A:"#009b48",M3:"#00a3e0",M3A:"#00a3e0",M4:"#e5007d",M5:"#6f2c91",M6:"#b17f4a",M7:"#f29fc5",M8:"#1e3f95",M9:"#d4a800",T1:"#0057a8",T3:"#8b5a2b",T4:"#f28c28",F1:"#6d597a",F2:"#6d597a",F3:"#6d597a"};
 const lc = L => METRO_C[L.b] || (TYPES[L.t]||TYPES.otobus).c;
 const tad = L => (TYPES[L.t]||TYPES.otobus).ad;
-const FILTERS = ["hepsi","metro","marmaray","tramvay","vapur","minibus","dolmus","funikuler","teleferik"];
+const FILTERS = ["hepsi","otobus","metrobus","metro","marmaray","tramvay","vapur","minibus","dolmus","funikuler","teleferik"];
 
 // ================= YARDIMCILAR =================
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -213,6 +213,8 @@ async function loadData(){
     (BYNAME[n]=BYNAME[n]||[]).push(id);
     (GRID[gk(la,lo)]=GRID[gk(la,lo)]||[]).push(id);
   }
+  FAST={}; LINES.forEach(L=>{ if(FASTT.has(L.t)) L.dir.forEach(x=>x.s.forEach(s=>FAST[s]=1)); });
+  SI=null; setTimeout(()=>{ if(!SI) buildIndex(); },0);
   NAMES=Object.keys(BYNAME).sort((a,b)=>a.localeCompare(b,"tr"));
   // Konumu bilinmeyen durakları hatlardan çıkar
   LINES.forEach(L=>L.dir.forEach(x=>{ const keep=x.s.map((s,i)=>STOPS[s]?i:-1).filter(i=>i>=0); if(keep.length<x.s.length){ x.o=keep.map(i=>x.o[i]); x.s=keep.map(i=>x.s[i]); } }));
@@ -226,6 +228,16 @@ function near(p,r){
   return out.sort((a,b)=>a.d-b.d);
 }
 const nearCache={};
+// Durağın "hızlı" bir hat (raylı, vapur, metrobüs) durağı olup olmadığı
+const FASTT=new Set(["metro","marmaray","tramvay","vapur","metrobus","funikuler","teleferik","raylı"]);
+let FAST={};
+// Erişim durakları: yakındakilerin hepsi, uzaktakilerden sadece hızlı hat durakları
+// r: yavaş hat (otobüs, minibüs) durakları için yürüme sınırı, fr: hızlı hat durakları için
+function access(p,r,fr){
+  fr=Math.max(fr||r,r); const all=near(p,fr), out=[]; let slow=0;
+  for(const x of all){ if(FAST[x.id]||(x.d<=r&&slow++<120)) out.push(x); }
+  return out;
+}
 const nearStop=(id,r)=>nearCache[id+"/"+r]||(nearCache[id+"/"+r]=near(STOPS[id].p,r));
 const linesAtName=n=>{const s=new Set();(BYNAME[n]||[]).forEach(id=>(IDX[id]||[]).forEach(([li])=>s.add(li)));return [...s].map(i=>LINES[i]);};
 
@@ -276,7 +288,8 @@ function viewLine(){
   const L=LINES.find(x=>x.id===state.line); if(!L) return "";
   const di=Math.min(state.dir,L.dir.length-1), x=L.dir[di], now=nowMin();
   const nx=nextAt(x,0,now,3);
-  const seg=L.dir.length>1?`<div class="seg">${L.dir.map((d,i)=>`<button class="${i===di?"on":""}" data-dir="${i}">${esc(d.h||STOPS[d.s[d.s.length-1]]?.n||"Yön "+(i+1))} yönü</button>`).join("")}</div>`:"";
+  const shown=L.dir.map((d,i)=>[d,i]).filter(([d])=>d.m!==0); const opts=shown.length?shown:L.dir.slice(0,2).map((d,i)=>[d,i]);
+  const seg=opts.length>1?`<div class="seg">${opts.map(([d,i])=>`<button class="${i===di?"on":""}" data-dir="${i}">${esc(d.h||STOPS[d.s[d.s.length-1]]?.n||"Yön "+(i+1))} yönü</button>`).join("")}</div>`:"";
   return `<button class="back" data-back>‹ Geri</button>
   <div class="hero"><div class="row">${badge(L)}<div style="flex:1;min-width:0"><h2>${esc(L.n)}</h2><p>${tad(L)}${L.a?" · "+esc(L.a):""} · ${x.s.length} durak · ~${Math.round(x.o[x.o.length-1])} dk</p></div>
     <button class="star ${isFav("h",L.id)?"on":""}" data-fh="${L.id}">${isFav("h",L.id)?"★":"☆"}</button></div>${seg}
@@ -337,17 +350,22 @@ function initMap(){
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
   lineLayer=L.layerGroup().addTo(map); stopLayer=L.layerGroup(); vehLayer=L.layerGroup().addTo(map); routeLayer=L.layerGroup().addTo(map);
   // Raylı sistem ve vapur hatları (arka planda, soluk)
-  LINES.forEach(Ln=>{ if(Ln.t==="minibus"||Ln.t==="dolmus") return;
+  LINES.forEach(Ln=>{ if(Ln.t==="minibus"||Ln.t==="dolmus"||Ln.t==="otobus") return;
     const x=Ln.dir[0], pts=x.g||x.s.map(s=>STOPS[s]?.p).filter(Boolean);
     L.polyline(pts,{color:lc(Ln),weight:Ln.t==="vapur"?1.5:3,opacity:.45,dashArray:Ln.t==="vapur"?"4 6":null,interactive:false}).addTo(lineLayer);
   });
-  Object.values(STOPS).forEach(S=>{
-    L.circleMarker(S.p,{radius:4,color:"#333",weight:1,fillColor:"#fff",fillOpacity:1})
-      .bindPopup(`<div class="pop"><b>${esc(S.n)}</b><button data-pick="to" data-sid="${S.id}">Buraya git</button><button class="g" data-pick="from" data-sid="${S.id}">Buradan başla</button><button class="g" data-pop-stop="${esc(S.n)}">Saatler</button></div>`)
-      .addTo(stopLayer);
-  });
-  map.on("zoomend",()=>{ if(map.getZoom()>=15&&M.sel===null) stopLayer.addTo(map); else stopLayer.remove(); drawVehicles(); });
-  map.on("moveend",drawVehicles);
+  // Duraklar: sadece yakınlaşınca ve sadece görünen bölgedekiler (20 binden fazla durak var)
+  const drawStops=()=>{
+    stopLayer.clearLayers();
+    if(map.getZoom()<15||M.sel!==null){ stopLayer.remove(); return; }
+    const b=map.getBounds(), c=b.getCenter(), r=Math.min(2500,map.distance(c,b.getNorthEast()));
+    near([c.lat,c.lng],r).slice(0,600).forEach(({id})=>{ const S=STOPS[id];
+      L.circleMarker(S.p,{radius:4,color:"#333",weight:1,fillColor:"#fff",fillOpacity:1})
+        .bindPopup(`<div class="pop"><b>${esc(S.n)}</b><button data-pick="to" data-sid="${S.id}">Buraya git</button><button class="g" data-pick="from" data-sid="${S.id}">Buradan başla</button><button class="g" data-pop-stop="${esc(S.n)}">Saatler</button></div>`)
+        .addTo(stopLayer); });
+    stopLayer.addTo(map);
+  };
+  map.on("moveend",()=>{ drawStops(); drawVehicles(); });
   // Haritaya dokununca: buradan mı, buraya mı?
   map.on("click",e=>{
     if(M.sel!==null) return;
@@ -372,12 +390,12 @@ function drawVehicles(){
       const f=Math.min(1,Math.max(0,(e-x.o[i])/((x.o[i+1]-x.o[i])||1)));
       const p=[A.la+(B.la-A.la)*f, A.lo+(B.lo-A.lo)*f];
       const txt=e<x.o[g.from]?`${inMin(g.board)} sonra durağında`:"Yolculuk sürüyor";
-      L.marker(p,{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${lc(Ln)};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%);display:inline-block">${({metro:"🚇",marmaray:"🚆",tramvay:"🚊",vapur:"⛴",minibus:"🚐",dolmus:"🚐",funikuler:"🚞",teleferik:"🚡"})[Ln.t]||"🚍"} ${esc(Ln.b)}</span>`,iconSize:[0,0]})}).bindTooltip(`Bineceğin araç · ${txt} · tahmini`).addTo(vehLayer);
+      L.marker(p,{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${lc(Ln)};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%);display:inline-block">${({metro:"🚇",marmaray:"🚆",tramvay:"🚊",vapur:"⛴",minibus:"🚐",dolmus:"🚐",otobus:"🚌",metrobus:"🚌",funikuler:"🚞",teleferik:"🚡"})[Ln.t]||"🚍"} ${esc(Ln.b)}</span>`,iconSize:[0,0]})}).bindTooltip(`Bineceğin araç · ${txt} · tahmini`).addTo(vehLayer);
     });
     return;
   }
   LINES.forEach((Ln,li)=>{
-    if(z<14&&(Ln.t==="minibus"||Ln.t==="dolmus")) return;
+    if(z<14&&(Ln.t==="minibus"||Ln.t==="dolmus"||Ln.t==="otobus")) return;
     Ln.dir.forEach(x=>{
       const a=depsToday(x), dur=x.o[x.o.length-1];
       let lo=0,hi=a.length; const t0=now-dur; while(lo<hi){const m=(lo+hi)>>1; if(a[m]<t0) lo=m+1; else hi=m;}
@@ -422,61 +440,76 @@ function askLocation(cb){
 
 // ================= ROTA HESABI (RAPTOR) =================
 // Tur tur arama: her turda bir araca daha binilir (en fazla 4 araç = 3 aktarma).
+// Hızlı arama için sayısal dizin: durak kimliği <-> sayı
+let SI=null, IS=null, IDXI=null, NSTOP=0;
+function buildIndex(){
+  IS=Object.keys(STOPS); SI={}; IS.forEach((id,i)=>SI[id]=i); NSTOP=IS.length;
+  IDXI=new Array(NSTOP);
+  LINES.forEach((L,li)=>L.dir.forEach((x,di)=>{ x.si=Int32Array.from(x.s.map(s=>SI[s])); x.oi=Float64Array.from(x.o);
+    x.si.forEach((s,pos)=>{ (IDXI[s]||(IDXI[s]=[])).push(li*1000+di, pos); }); }));
+}
+const xferCache=[];
+function xferOf(s,R){ const c=xferCache[s]; if(c&&c.R===R) return c.v;
+  // en yakın 25 durak + menzildeki tüm hızlı hat (raylı, vapur, metrobüs) durakları
+  let slow=0; const v=nearStop(IS[s],R).filter(x=>x.id!==IS[s]&&(FAST[x.id]||slow++<25)).map(x=>[SI[x.id],x.d,walkMin(x.d)]); xferCache[s]={R,v}; return v; }
 function raptor(origins,dests,t0,banned,opt){
-  const MAX_LEGS=(opt&&opt.legs)||4, XFER_R=(opt&&opt.xfer)||500, HOR=(opt&&opt.hor)||180;
-  const best={}, lab=[{}], marked=new Set();
-  origins.forEach(({id,d})=>{ const t=t0+walkMin(d); if(best[id]===undefined||t<best[id]){ best[id]=t; lab[0][id]={o:true,t,m:Math.round(d),w:walkMin(d)}; marked.add(id);} });
-  const dmap={}; dests.forEach(({id,d})=>{ dmap[id]=Math.min(dmap[id]??1e9,walkMin(d)); });
-  const tgt=()=>{let b=1e9;for(const id in dmap){const t=best[id];if(t!==undefined&&t+dmap[id]<b)b=t+dmap[id];}return b;};
-    const results=[];
-  for(let k=1;k<=MAX_LEGS&&marked.size;k++){
-    lab[k]={};
+  if(!SI) buildIndex();
+  const MAX_LEGS=(opt&&opt.legs)||4, XFER_R=(opt&&opt.xfer)||500, HOR=(opt&&opt.hor)||180, INF=1e9;
+  const best=new Float64Array(NSTOP).fill(INF), pT=new Float64Array(NSTOP).fill(INF), pK=new Int8Array(NSTOP);
+  const dmap=new Float64Array(NSTOP).fill(-1), dlist=[];
+  dests.forEach(({id,d})=>{ const s=SI[id]; if(s===undefined) return; const w=walkMin(d); if(dmap[s]<0||w<dmap[s]){ if(dmap[s]<0) dlist.push(s); dmap[s]=w; } });
+  const lab=[new Map()]; let marked=[]; const mflag=new Uint8Array(NSTOP);
+  let bestT=INF; const upd=(s,t)=>{ const w=dmap[s]; if(w>=0&&t+w<bestT) bestT=t+w; };
+  origins.forEach(({id,d})=>{ const s=SI[id]; if(s===undefined) return; const t=t0+walkMin(d);
+    if(t<best[s]){ best[s]=t; pT[s]=t; pK[s]=0; lab[0].set(s,{o:true,t,m:Math.round(d),w:walkMin(d)}); if(!mflag[s]){mflag[s]=1;marked.push(s);} upd(s,t);} });
+  const results=[];
+  for(let k=1;k<=MAX_LEGS&&marked.length;k++){
+    const Lk=new Map(); lab[k]=Lk;
     // Bu turda taranacak hat-yönler ve en erken biniş noktası
     const Q=new Map();
-    marked.forEach(id=>(IDX[id]||[]).forEach(([li,di,pos])=>{ if(banned&&banned.has(li)) return; const key=li*4+di; if(!Q.has(key)||pos<Q.get(key)) Q.set(key,pos); }));
-    marked.clear();
-    // Bu durağa önceki turların herhangi birinde ulaşılan en iyi zaman
-    const prevT=id=>{for(let j=k-1;j>=0;j--){const L=lab[j][id];if(L)return [L.t,j];}return undefined;};
-    const bound=tgt();
+    for(const s of marked){ mflag[s]=0; const ix=IDXI[s]; if(!ix) continue;
+      for(let j=0;j<ix.length;j+=2){ const key=ix[j], pos=ix[j+1]; if(banned&&banned.has(Math.floor(key/1000))) continue; const q=Q.get(key); if(q===undefined||pos<q) Q.set(key,pos); } }
+    marked=[];
     Q.forEach((p0,key)=>{
-      const li=Math.floor(key/4), di=key%4, x=LINES[li].dir[di], deps=depsToday(x);
-      let trip=null, bpos=-1, bstop=null, bk=0;
-      for(let i=p0;i<x.s.length;i++){
-        const s=x.s[i];
-        if(trip!==null){
-          const arr=trip+x.o[i];
-          if(arr<(best[s]??1e9)&&arr<bound){ best[s]=arr; lab[k][s]={t:arr,li,di,from:bpos,to:i,board:trip+x.o[bpos],bs:bstop,bk}; marked.add(s); }
+      const li=Math.floor(key/1000), di=key%1000, x=LINES[li].dir[di], deps=depsToday(x), si=x.si, oi=x.oi, n=si.length;
+      let trip=-1, bpos=-1, bstop=-1, bk=0;
+      for(let i=p0;i<n;i++){
+        const s=si[i];
+        if(trip>=0){
+          const arr=trip+oi[i];
+          if(arr<best[s]&&arr<bestT){ best[s]=arr; upd(s,arr); Lk.set(s,{t:arr,li,di,from:bpos,to:i,board:trip+oi[bpos],bs:bstop,bk}); if(!mflag[s]){mflag[s]=1;marked.push(s);} }
         }
-        const pv=prevT(s), pt=pv&&pv[0];
-        if(pv!==undefined&&i<x.s.length-1&&(trip===null||pt<=trip+x.o[i])){
+        const pt=pT[s];
+        if(pt<bestT&&i<n-1&&(trip<0||pt<=trip+oi[i])){
           // daha erken bir sefere binilebilir mi?
-          const target=pt+(k>1?1:0)-x.o[i]; let lo=0,hi=deps.length;
+          const target=pt+(k>1?1:0)-oi[i]; let lo=0,hi=deps.length;
           while(lo<hi){const m=(lo+hi)>>1; if(deps[m]<target) lo=m+1; else hi=m;}
-          if(lo<deps.length&&deps[lo]-t0+x.o[i]<HOR&&(trip===null||deps[lo]<trip)){ trip=deps[lo]; bpos=i; bstop=s; bk=pv[1]; }
+          if(lo<deps.length&&deps[lo]-t0+oi[i]<HOR&&(trip<0||deps[lo]<trip)){ trip=deps[lo]; bpos=i; bstop=s; bk=pK[s]; }
         }
       }
     });
     // Aktarma yürüyüşleri (araçtan inilen duraklardan yakındaki duraklara)
-    [...marked].forEach(s=>{ const L=lab[k][s]; if(!L||L.wk) return;
-      nearStop(s,XFER_R).forEach(({id,d})=>{ if(id===s) return; const t=L.t+walkMin(d)+1;
-        if(t<(best[id]??1e9)){ best[id]=t; lab[k][id]={t,wk:true,from:s,m:Math.round(d),ride:L}; marked.add(id); } });
-    });
+    const rides=marked.slice();
+    for(const s of rides){ const L=Lk.get(s); if(!L||L.wk) continue;
+      for(const [id,d,w] of xferOf(s,XFER_R)){ const t=L.t+w+1;
+        if(t<best[id]&&t<bestT){ best[id]=t; upd(id,t); Lk.set(id,{t,wk:true,from:s,m:Math.round(d),ride:L}); if(!mflag[id]){mflag[id]=1;marked.push(id);} } } }
+    for(const s of marked){ pT[s]=Lk.get(s).t; pK[s]=k; }
     // Bu turun en iyi varışı
-    let bd=null; for(const id in dmap){ const L=lab[k][id]; if(!L) continue; const a=L.t+dmap[id]; if(!bd||a<bd.arr) bd={arr:a,id}; }
-    if(bd) results.push(rebuild(lab,k,bd.id,bd.arr,dmap,dests));
+    let bd=null; for(const s of dlist){ const L=Lk.get(s); if(!L) continue; const a=L.t+dmap[s]; if(!bd||a<bd.arr) bd={arr:a,s}; }
+    if(bd) results.push(rebuild(lab,k,bd.s,bd.arr,dmap,dests));
   }
   return results;
 }
 function rebuild(lab,k,s,arr,dmap,dests){
   const dd=id=>{const x=dests.find(q=>q.id===id);return x?x.d:0;};
-  let L=lab[k][s], w2={sid:s,m:Math.round(dd(s)),w:dmap[s]};
-  if(L.wk){ w2={sid:L.from,m:Math.round(L.m+dd(s)),w:walkMin(L.m)+dmap[s]}; s=L.from; L=L.ride; }
+  let L=lab[k].get(s), w2={sid:IS[s],m:Math.round(dd(IS[s])),w:dmap[s]};
+  if(L.wk){ w2={sid:IS[L.from],m:Math.round(L.m+dd(IS[s])),w:walkMin(L.m)+dmap[s]}; s=L.from; L=L.ride; }
   const legs=[]; let w1;
   for(;;){
     legs.unshift({li:L.li,di:L.di,from:L.from,to:L.to,board:L.board,tw:0});
     s=L.bs; k=L.bk;
-    const P=lab[k][s];
-    if(P.o){ w1={sid:s,m:P.m,w:P.w}; break; }
+    const P=lab[k].get(s);
+    if(P.o){ w1={sid:IS[s],m:P.m,w:P.w}; break; }
     if(P.wk){ legs[0].tw=P.m; s=P.from; L=P.ride; } else L=P;
   }
   return {legs,w1,w2,arr};
@@ -510,16 +543,16 @@ function rank(all,now,limit){
 function plan(A,B,Aids,Bids){
   const now=nowMin(), all=[], dAB=hav(A,B);
   if(dAB<3000) all.push({walk:true,m:Math.round(dAB),arr:now+walkMin(dAB)});
-  const radii=(Aids&&Bids)?[0]:[400,900,1500];
-  for(const r of radii){
-    const O=Aids?Aids.map(id=>({id,d:0})):near(A,r), Dn=Bids?Bids.map(id=>({id,d:0})):near(B,r);
+  // Başlangıç ve varış tarafında farklı yürüme sınırları: [başlangıç hızlı-hat sınırı, varış hızlı-hat sınırı]
+  const combos=(Aids&&Bids)?[[0,0]]:[[600,1500],[1500,600],[1500,1500]];
+  for(const [ra,rb] of combos){
+    const O=Aids?Aids.map(id=>({id,d:0})):access(A,600,ra), Dn=Bids?Bids.map(id=>({id,d:0})):access(B,600,rb);
     if(!O.length||!Dn.length) continue;
     const res=raptor(O,Dn,now); all.push(...res);
     if(res.length){
       const best=res.reduce((x,c)=>c.arr<x.arr?c:x);
       const main=best.legs.reduce((x,c)=>(c.to-c.from)>(x.to-x.from)?c:x);
       all.push(...raptor(O,Dn,now,new Set([main.li])));
-      if(best.legs.length>1) all.push(...raptor(O,Dn,now,new Set(best.legs.map(l=>l.li))));
     }
   }
   M.found=all;
@@ -529,22 +562,22 @@ function plan(A,B,Aids,Bids){
 async function deepPlan(){
   const now=nowMin(), all=[...(M.found||[])], opt={legs:6,xfer:800,hor:240}, run=M.runId=(M.runId||0)+1;
   const yieldUI=()=>new Promise(r=>setTimeout(r,0));
-  const radii=(M.Aids&&M.Bids)?[0]:[300,600,1000,1500,2500];
-  let n=0; const total=radii.length*14+4;
+  const radii=(M.Aids&&M.Bids)?[[0,0]]:[[400,400],[400,2500],[2500,400],[900,2500],[2500,900]];
+  let n=0; const total=radii.length*10+4;
   const step=async()=>{ n++; if(n%3===0){ M.deepMsg=`Geniş arama… %${Math.min(99,Math.round(n/total*100))} · ${new Set(all.map(planKey)).size} seçenek`; renderPlans(); await yieldUI(); if(M.runId!==run) throw 0; } };
   try{
-    for(const r of radii){
-      const O=M.Aids?M.Aids.map(id=>({id,d:0})):near(M.A,r), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):near(M.B,r);
+    for(const [ra,rb] of radii){
+      const O=M.Aids?M.Aids.map(id=>({id,d:0})):access(M.A,Math.min(ra,800),ra), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):access(M.B,Math.min(rb,800),rb);
       if(!O.length||!Dn.length) continue;
       const base=raptor(O,Dn,now,null,opt); all.push(...base); await step();
       // bulunan her hattı tek tek yasakla
-      const lines=[...new Set(all.filter(o=>!o.walk).flatMap(o=>o.legs.map(l=>l.li)))].slice(0,12);
+      const lines=[...new Set(all.filter(o=>!o.walk).flatMap(o=>o.legs.map(l=>l.li)))].slice(0,6);
       for(const li of lines){ all.push(...raptor(O,Dn,now,new Set([li]),opt)); await step(); }
       // birkaç hattı birlikte yasakla (bambaşka güzergâhlar için)
       if(lines.length>2){ all.push(...raptor(O,Dn,now,new Set(lines.slice(0,3)),opt)); await step(); }
     }
     // biraz sonra çıkarsan
-    const O=M.Aids?M.Aids.map(id=>({id,d:0})):near(M.A,900), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):near(M.B,900);
+    const O=M.Aids?M.Aids.map(id=>({id,d:0})):access(M.A,600,1500), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):access(M.B,600,1500);
     for(const off of [10,20,30,45]){ all.push(...raptor(O,Dn,now+off,null,opt)); await step(); }
   }catch(e){ return; }
   if(M.runId!==run) return;
