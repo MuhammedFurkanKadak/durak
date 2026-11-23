@@ -362,9 +362,21 @@ function drawVehicles(){
   if(!map||document.getElementById("mapview").hidden) return;
   vehLayer.clearLayers();
   const now=nowMin(), b=map.getBounds().pad(.1), z=map.getZoom(), sel=M.sel!==null&&M.plans?M.plans[M.sel]:null;
-  const only=sel?new Set((sel.legs||[]).map(l=>l.li)):null;
+  // Detay ekranında: sadece bineceğin araçlar (her ayak için o sefer)
+  if(sel){
+    (sel.legs||[]).forEach(g=>{
+      const Ln=LINES[g.li], x=Ln.dir[g.di], start=g.board-x.o[g.from], e=now-start;
+      if(e<0||e>x.o[g.to]) return;
+      let i=0; while(i<x.o.length-2&&x.o[i+1]<e) i++;
+      const A=STOPS[x.s[i]], B=STOPS[x.s[i+1]]; if(!A||!B) return;
+      const f=Math.min(1,Math.max(0,(e-x.o[i])/((x.o[i+1]-x.o[i])||1)));
+      const p=[A.la+(B.la-A.la)*f, A.lo+(B.lo-A.lo)*f];
+      const txt=e<x.o[g.from]?`${inMin(g.board)} sonra durağında`:"Yolculuk sürüyor";
+      L.marker(p,{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${lc(Ln)};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%);display:inline-block">${({metro:"🚇",marmaray:"🚆",tramvay:"🚊",vapur:"⛴",minibus:"🚐",dolmus:"🚐",funikuler:"🚞",teleferik:"🚡"})[Ln.t]||"🚍"} ${esc(Ln.b)}</span>`,iconSize:[0,0]})}).bindTooltip(`Bineceğin araç · ${txt} · tahmini`).addTo(vehLayer);
+    });
+    return;
+  }
   LINES.forEach((Ln,li)=>{
-    if(only&&!only.has(li)) return;
     if(!only&&z<14&&(Ln.t==="minibus"||Ln.t==="dolmus")) return;
     Ln.dir.forEach(x=>{
       const a=depsToday(x), dur=x.o[x.o.length-1];
