@@ -118,6 +118,10 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .dur small{font-size:13px;font-weight:600}
 .dur span{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px}
 .chev{color:var(--muted);font-size:22px}
+.dchips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;scrollbar-width:none}
+.dchip{flex:none;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;font:inherit;color:var(--ink);cursor:pointer;text-align:left}
+.dchip span:last-child{font-size:13px;font-weight:700;line-height:1.2}
+.dchip small{display:block;font-size:11px;color:var(--muted);font-weight:500}
 .tags{display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap}
 .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--brand) 22%,transparent);color:var(--ink)}
 .dhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:10px}
@@ -235,6 +239,12 @@ const nearCache={};
 const FASTT=new Set(["metro","marmaray","tramvay","vapur","metrobus","funikuler","teleferik","raylı"]);
 let FAST={};
 // Erişim durakları: yakındakilerin hepsi, uzaktakilerden sadece hızlı hat durakları
+// Durak adı seçildiyse: o addaki duraklar (yürümesiz) + her birinin 500 m çevresindeki duraklar (yürüyerek)
+function groupAccess(ids){
+  const m={}; ids.forEach(id=>m[id]=0);
+  ids.forEach(id=>near(STOPS[id].p,500).forEach(({id:j,d})=>{ if(m[j]===undefined||d<m[j]) m[j]=d; }));
+  return Object.entries(m).map(([id,d])=>({id,d}));
+}
 // r: yavaş hat (otobüs, minibüs) durakları için yürüme sınırı, fr: hızlı hat durakları için
 function access(p,r,fr){
   fr=Math.max(fr||r,r); const all=near(p,fr), out=[]; let slow=0;
@@ -399,6 +409,7 @@ function drawVehicles(){
   }
   LINES.forEach((Ln,li)=>{
     if(z<14&&(Ln.t==="minibus"||Ln.t==="dolmus"||Ln.t==="otobus")) return;
+    if(z<13&&Ln.t==="metrobus") return;
     Ln.dir.forEach(x=>{
       const a=depsToday(x), dur=x.o[x.o.length-1];
       let lo=0,hi=a.length; const t0=now-dur; while(lo<hi){const m=(lo+hi)>>1; if(a[m]<t0) lo=m+1; else hi=m;}
@@ -538,9 +549,35 @@ function rank(all,now,limit){
   tag(o=>o.mt.arr,"En hızlı");
   if(kept.length>1){ tag(o=>o.walk?99:o.mt.legs,"En az aktarma"); tag(o=>o.mt.walk,"En az yürüme"); }
   const tagged=kept.filter(o=>o.tags.length), rest=kept.filter(o=>!o.tags.length);
-  const top=[...tagged,...rest].slice(0,5).sort((a,b)=>a.mt.arr-b.mt.arr);
+  let top=[...tagged,...rest].slice(0,5);
+  // Liste kısa kaldıysa makul alternatiflerle doldur: en hızlıdan en fazla 30 dk geç, en az aktarmadan en fazla 1 fazla aktarma, farklı ilk hat
+  if(top.length<5&&kept.length){
+    const fastest=Math.min(...kept.map(o=>o.mt.arr)), minLegs=Math.min(...kept.map(o=>o.mt.legs||9));
+    const firsts=new Set(top.filter(o=>!o.walk).map(o=>o.legs[0].li+"/"+(o.legs[1]?o.legs[1].li:"")));
+    for(const o of other){ if(top.length>=5) break;
+      if(o.walk||o.mt.arr>fastest+30||o.mt.legs>minLegs+1) continue;
+      const k=o.legs[0].li+"/"+(o.legs[1]?o.legs[1].li:""); if(firsts.has(k)) continue;
+      firsts.add(k); top.push(o); }
+  }
+  top.sort((a,b)=>a.mt.arr-b.mt.arr);
   const more=[...kept.filter(o=>!top.includes(o)),...other].sort((a,b)=>a.mt.arr-b.mt.arr);
   return {top,more:more.slice(0,limit-top.length)};
+}
+// Aktarmasız giden tüm hatlar: başlangıç durağından binip varış durağında inilebilen her hat-yön için sıradaki sefer
+function directLines(O,Dn,now){
+  const dest={}; Dn.forEach(({id,d})=>(IDX[id]||[]).forEach(([li,di,pos])=>{ (dest[li*1000+di]=dest[li*1000+di]||[]).push({pos,id,d}); }));
+  const best={};
+  O.forEach(({id,d})=>(IDX[id]||[]).forEach(([li,di,pos])=>{
+    const ds=dest[li*1000+di]; if(!ds) return;
+    const x=LINES[li].dir[di], w1=walkMin(d);
+    ds.forEach(e=>{ if(e.pos<=pos) return;
+      const b=nextAt(x,pos,now+w1)[0]; if(b===undefined||b-now>120) return;
+      const arr=b+(x.o[e.pos]-x.o[pos])+walkMin(e.d);
+      const k=LINES[li].b+"|"+LINES[li].n;
+      if(!best[k]||arr<best[k].arr) best[k]={legs:[{li,di,from:pos,to:e.pos,board:b,tw:0}],w1:{sid:id,m:Math.round(d),w:w1},w2:{sid:e.id,m:Math.round(e.d),w:walkMin(e.d)},arr};
+    });
+  }));
+  return Object.values(best).map(o=>(o.mt=metrics(o),o.tags=[],o)).sort((a,b)=>a.legs[0].board-b.legs[0].board).slice(0,20);
 }
 // Hızlı arama: birkaç yürüme sınırı + ana hat yasaklı tekrar
 function plan(A,B,Aids,Bids){
@@ -549,16 +586,19 @@ function plan(A,B,Aids,Bids){
   // Başlangıç ve varış tarafında farklı yürüme sınırları: [başlangıç hızlı-hat sınırı, varış hızlı-hat sınırı]
   const combos=(Aids&&Bids)?[[0,0]]:[[600,1500],[1500,600],[1500,1500]];
   for(const [ra,rb] of combos){
-    const O=Aids?Aids.map(id=>({id,d:0})):access(A,600,ra), Dn=Bids?Bids.map(id=>({id,d:0})):access(B,600,rb);
+    const O=Aids?groupAccess(Aids):access(A,600,ra), Dn=Bids?groupAccess(Bids):access(B,600,rb);
     if(!O.length||!Dn.length) continue;
     const res=raptor(O,Dn,now); all.push(...res);
-    if(res.length){
-      const best=res.reduce((x,c)=>c.arr<x.arr?c:x);
-      const main=best.legs.reduce((x,c)=>(c.to-c.from)>(x.to-x.from)?c:x);
-      all.push(...raptor(O,Dn,now,new Set([main.li])));
+    // Alternatifler: bulunan en iyi seçeneğin hatlarını sırayla yok sayarak tekrar ara (aynı aktarma sayısında farklı hatlar)
+    const ban=new Set(); let cur=res;
+    for(let i=0;i<(ra===combos[0][0]&&rb===combos[0][1]?5:1)&&cur.length;i++){
+      const best=cur.reduce((x,c)=>c.arr<x.arr?c:x);
+      best.legs.forEach(l=>ban.add(l.li));
+      cur=raptor(O,Dn,now,new Set(ban)); all.push(...cur);
     }
   }
   M.found=all;
+  { const O=Aids?groupAccess(Aids):access(A,600,900), Dn=Bids?groupAccess(Bids):access(B,600,900); M.direct=directLines(O,Dn,now); }
   return rank(all,now,5).top;
 }
 // Geniş arama: 2,5 km yürüme, 800 m aktarma, 6 araç, bulunan her hattı yasaklayıp tekrar, sonraki kalkışlar
@@ -570,7 +610,7 @@ async function deepPlan(){
   const step=async()=>{ n++; if(n%3===0){ M.deepMsg=`Geniş arama… %${Math.min(99,Math.round(n/total*100))} · ${new Set(all.map(planKey)).size} seçenek`; renderPlans(); await yieldUI(); if(M.runId!==run) throw 0; } };
   try{
     for(const [ra,rb] of radii){
-      const O=M.Aids?M.Aids.map(id=>({id,d:0})):access(M.A,Math.min(ra,800),ra), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):access(M.B,Math.min(rb,800),rb);
+      const O=M.Aids?groupAccess(M.Aids):access(M.A,Math.min(ra,800),ra), Dn=M.Bids?groupAccess(M.Bids):access(M.B,Math.min(rb,800),rb);
       if(!O.length||!Dn.length) continue;
       const base=raptor(O,Dn,now,null,opt); all.push(...base); await step();
       // bulunan her hattı tek tek yasakla
@@ -580,7 +620,7 @@ async function deepPlan(){
       if(lines.length>2){ all.push(...raptor(O,Dn,now,new Set(lines.slice(0,3)),opt)); await step(); }
     }
     // biraz sonra çıkarsan
-    const O=M.Aids?M.Aids.map(id=>({id,d:0})):access(M.A,600,1500), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):access(M.B,600,1500);
+    const O=M.Aids?groupAccess(M.Aids):access(M.A,600,1500), Dn=M.Bids?groupAccess(M.Bids):access(M.B,600,1500);
     for(const off of [10,20,30,45]){ all.push(...raptor(O,Dn,now+off,null,opt)); await step(); }
   }catch(e){ return; }
   if(M.runId!==run) return;
@@ -636,7 +676,10 @@ function renderPlans(){
   const el=document.getElementById("plans"), now=nowMin();
   if(!M.plans){ el.innerHTML=""; return; }
   const top=M.plans.slice(0,M.topCount), more=M.plans.slice(M.topCount);
-  let html=M.plans.length?`<h3 class="sec" style="margin-top:4px">Seçenekler</h3>`+top.map((o,k)=>planCard(o,k,now)).join("")
+  const dl=M.direct||[];
+  let html=dl.length?`<h3 class="sec" style="margin-top:4px">Aktarmasız giden hatlar</h3><div class="dchips">${dl.map((o,i)=>{const g=o.legs[0],Ln=LINES[g.li];
+      return `<button class="dchip" data-direct="${i}"><span class="cb" style="background:${lc(Ln)}">${esc(Ln.b)}</span><span>${inMin(g.board)==="Şimdi"?"şimdi":inMin(g.board)}<small>${fmt(g.board)} · ${dk(o.arr-now)}</small></span></button>`;}).join("")}</div>`:"";
+  html+=M.plans.length?`<h3 class="sec" style="margin-top:4px">Seçenekler</h3>`+top.map((o,k)=>planCard(o,k,now)).join("")
     :`<div class="empty">Hızlı aramada yol bulunamadı. Aşağıdan geniş arama yapabilirsin.</div>`;
   if(M.deep==="done"){
     html+=more.length?`<h3 class="sec">Diğer seçenekler (${more.length})</h3>`+more.map((o,i)=>planCard(o,M.topCount+i,now)).join("")
@@ -742,13 +785,16 @@ async function fromLink(w,raw){
 function showSugg(which){
   M.field=which; const inp=which==="from"?fromQ:toQ, raw=inp.value.trim().replace("📍 ",""), q=norm(raw);
   const score=n=>{const x=norm(n);return x===q?0:x.startsWith(q)?1:2;};
-  const r=q.length>=2?NAMES.filter(n=>norm(n).includes(q)).sort((a,b)=>score(a)-score(b)||a.length-b.length).slice(0,4):[];
+  // Aynı adın büyük/küçük harf farklı kayıtlarını tek göster (seçince hepsi birlikte kullanılır)
+  const seenN=new Set();
+  const r=q.length>=2?NAMES.filter(n=>norm(n).includes(q)).sort((a,b)=>score(a)-score(b)||a.length-b.length||(a===a.toLocaleUpperCase("tr"))-(b===b.toLocaleUpperCase("tr")))
+    .filter(n=>{const k=norm(n);if(seenN.has(k))return false;seenN.add(k);return true;}).slice(0,5):[];
   sugg.style.top=(inp.offsetTop+inp.offsetHeight+6)+"px";
   const isLink=/^https?:\/\//.test(raw)||coordFrom(raw);
   if(isLink){ sugg.style.top=(inp.offsetTop+inp.offsetHeight+6)+"px"; sugg.innerHTML=`<button data-sug-link>🔗 Linkteki/koordinattaki konumu kullan</button>`; sugg.hidden=false; return; }
   sugg.innerHTML=`<button data-sug-loc>📍 Konumum</button><button data-sug-map>🗺️ Haritada seç</button>`+
     (r.length?`<div class="sh">Duraklar</div>`:"")+
-    r.map(n=>`<button data-sug="${esc(n)}">🚏 ${esc(n)} <small>${linesAtName(n).slice(0,3).map(l=>esc(l.b)).join(", ")}</small></button>`).join("")+
+    r.map(n=>`<button data-sug="${esc(n)}">🚏 ${esc(n)} <small>${[...new Set(group(n).flatMap(id=>(IDX[id]||[]).map(([li])=>LINES[li].b)))].slice(0,5).map(esc).join(", ")}</small></button>`).join("")+
     (raw.length>=3?`<div class="sh">Yerler ve adresler</div><div id="places"><button disabled><small>Aranıyor…</small></button></div>`:"");
   sugg.hidden=false;
   clearTimeout(placeTimer);
@@ -781,7 +827,8 @@ document.getElementById("swap").onclick=()=>{
   [M.A,M.B,M.Aname,M.Bname,M.Aids,M.Bids]=[M.B,M.A,M.Bname,M.Aname,M.Bids,M.Aids]; setEnd("from",M.A,M.Aname,M.Aids);
 };
 // Aynı addaki duraklar (ilk durağa 2,5 km'den yakın olanlar)
-const group=n=>{const f=STOPS[BYNAME[n][0]];return BYNAME[n].filter(id=>hav(f.p,STOPS[id].p)<2500);};
+const group=n=>{const f=STOPS[BYNAME[n][0]], k=norm(n);
+  return NAMES.filter(x=>norm(x)===k).flatMap(x=>BYNAME[x]).filter(id=>hav(f.p,STOPS[id].p)<2500);};
 function gotoStopName(n){ setEnd("to",STOPS[BYNAME[n][0]].p,n,group(n)); }
 
 // ================= ÇİZİM =================
@@ -798,9 +845,10 @@ function render(){
 function openLine(id,d){ hist.push({line:state.line,stop:state.stop,dir:state.dir,tab:state.tab}); go({line:id,stop:null,dir:+(d||0)}); }
 function openStop(n){ hist.push({line:state.line,stop:state.stop,dir:state.dir,tab:state.tab}); go({stop:n,line:null}); }
 document.addEventListener("click",e=>{
-  const el=e.target.closest("[data-deep],[data-pick],[data-open],[data-dback],[data-fh],[data-fd],[data-f],[data-dir],[data-back],[data-line],[data-stop],[data-goto],[data-pop-stop]"); if(!el) return;
+  const el=e.target.closest("[data-direct],[data-deep],[data-pick],[data-open],[data-dback],[data-fh],[data-fd],[data-f],[data-dir],[data-back],[data-line],[data-stop],[data-goto],[data-pop-stop]"); if(!el) return;
   const ds=el.dataset;
   if(ds.pick){ const ll=ds.sid?STOPS[ds.sid].p:ds.ll.split(",").map(Number); return setEnd(ds.pick,ll,ds.sid?STOPS[ds.sid].n:"Haritada seçilen nokta"); }
+  if(ds.direct!==undefined){ const o=M.direct[+ds.direct]; M.plans.push(o); return openPlan(M.plans.length-1); }
   if(el.hasAttribute("data-deep")){ M.deep="run"; renderPlans(); return setTimeout(deepPlan,30); }
   if(ds.open!==undefined) return openPlan(+ds.open);
   if(el.hasAttribute("data-dback")){ showList(); try{map.fitBounds(L.latLngBounds([M.A,M.B]).pad(.25));}catch(e){} return; }
