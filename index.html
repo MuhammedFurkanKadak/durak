@@ -547,9 +547,52 @@ function metrics(o){
   return {leave,arr:o.arr,dur:o.arr-leave,legs:o.legs.length,walk:o.w1.m+o.w2.m+o.legs.reduce((s,l)=>s+(l.tw||0),0)};
 }
 const planKey=o=>o.walk?"walk":o.legs.map(l=>l.li).join(">")+"@"+Math.round(o.legs[0].board);
+// Aynı güzergâhta başka hatlar: bulunan seçeneğin her ayağında, aynı yerden (200 m) binip aynı yerde (200 m) inen
+// diğer hatları dene. Ara ayakta sonraki araca yetişmeli; ilk ayakta en geç uygun sefer; son ayakta varış en çok 40 dk geç.
+function legVariants(o,now){
+  const out=[], n=o.legs.length, A=M.A, B=M.B, P=id=>STOPS[id].p;
+  const sid=(g,k)=>LINES[g.li].dir[g.di].s[k], legArr=g=>{const x=LINES[g.li].dir[g.di];return g.board+x.o[g.to]-x.o[g.from];};
+  for(let i=0;i<n;i++){
+    const g=o.legs[i], bS=sid(g,g.from), aS=sid(g,g.to), Lb=LINES[g.li].b, last=i===n-1;
+    const prev=i>0?o.legs[i-1]:null, next=last?null:o.legs[i+1];
+    const prevStop=prev?sid(prev,prev.to):null, prevArr=prev?legArr(prev):0, nextStop=next?sid(next,next.from):null;
+    const aC={}; nearStop(aS,200).forEach(({id,d})=>aC[id]=d);
+    const best={};
+    for(const {id:b} of nearStop(bS,200)){
+      let ready, w1m=0, twm=0;
+      if(i===0){ w1m=(M.Aids&&M.Aids.includes(b))?0:hav(A,P(b)); if(w1m>o.w1.m+250) continue; ready=now+walkMin(w1m); }
+      else { twm=prevStop===b?0:hav(P(prevStop),P(b)); if(twm>Math.max(g.tw||0,0)+250||twm>800) continue; ready=prevArr+(twm?walkMin(twm):0)+1; }
+      for(const [li,di,pos] of (IDX[b]||[])){
+        const Ln=LINES[li]; if(Ln.b===Lb) continue; const x=Ln.dir[di];
+        let q=-1; for(let j=pos+1;j<x.s.length;j++) if(aC[x.s[j]]!==undefined){ q=j; break; }
+        if(q<0) continue;
+        const ride=x.o[q]-x.o[pos], a=x.s[q]; let b0, w2m=0, tw2=0, arr=o.arr;
+        if(last){ b0=nextAt(x,pos,ready)[0]; if(b0===undefined) continue;
+          w2m=(M.Bids&&M.Bids.includes(a))?0:hav(P(a),B); if(w2m>o.w2.m+250) continue;
+          arr=b0+ride+walkMin(w2m); if(arr>o.arr+40) continue; }
+        else { tw2=a===nextStop?0:hav(P(a),P(nextStop)); if(tw2>800) continue;
+          const dl=next.board-(tw2?walkMin(tw2):0)-1-ride, ds=nextAt(x,pos,ready,i===0?8:1).filter(t=>t<=dl);
+          if(!ds.length) continue; b0=i===0?ds[ds.length-1]:ds[0]; }
+        const legs=o.legs.map(l=>({...l}));
+        legs[i]={li,di,from:pos,to:q,board:b0,tw:i>0?Math.round(twm):0};
+        if(next) legs[i+1].tw=Math.round(tw2);
+        const v={legs,arr,_v:1,
+          w1:i===0?{sid:b,m:Math.round(w1m),w:walkMin(w1m)}:o.w1,
+          w2:last?{sid:a,m:Math.round(w2m),w:walkMin(w2m)}:o.w2};
+        const mt=metrics(v), k=Ln.b+"|"+Ln.t;
+        if(!best[k]||mt.dur<best[k].mt.dur){ v.mt=mt; best[k]=v; }
+      }
+    }
+    out.push(...Object.values(best));
+  }
+  return out;
+}
 // Seçenekleri sırala: Pareto (her açıdan daha kötüsü olmayanlar) önce, etiketli
 // Sıralama: yolculuk süresine göre (evden çıkıştan varışa). Her açıdan daha kötü olanlar (süre, aktarma, yürüme) elenir.
 function rank(all,now,limit){
+  // Bulunan iyi seçeneklere aynı güzergâhtaki diğer hatları ekle (bir kez)
+  const bd0=Math.min(...all.filter(o=>!o.walk).map(o=>metrics(o).dur),1e9);
+  for(let j=0,L0=all.length;j<L0;j++){ const o=all[j]; if(o.walk||o._x||o._v) continue; if(metrics(o).dur>bd0+40) continue; o._x=1; all.push(...legVariants(o,now)); }
   const byKey={};
   // Aynı hat dizisi: en kısa süreni, eşitse en erken çıkanı tut
   all.forEach(o=>{ o.mt=metrics(o); const k=o.walk?"walk":o.legs.map(l=>l.li).join(">"); const q=byKey[k];
