@@ -383,8 +383,11 @@ function plan(A,B){
   const nl=o=>o.legs?o.legs.length:0;
   res.sort((a,b)=>a.arr-b.arr||nl(a)-nl(b)||(a.w1?.w||0)-(b.w1?.w||0));
   const seen=new Set(), out=[];
+  // Direkt binilebilen bir araca aktarmayla ulaşmak anlamsız: ilk ayak gereksiz
+  const direct=new Set(res.filter(o=>o.legs&&o.legs.length===1).map(o=>{const g=o.legs[0];return g.li+"|"+g.di+"|"+g.from;}));
   for(const o of res){
     if(o.walk){ out.push(o); continue; }
+    if(o.legs.length>1){const g=o.legs[o.legs.length-1]; if(direct.has(g.li+"|"+g.di+"|"+g.from)) continue;}
     const last=o.legs[o.legs.length-1], k1=last.li+"@"+Math.round(last.board), k2=o.legs.map(l=>l.li).join(">");
     if(seen.has(k1)||seen.has(k2)) continue;
     seen.add(k1); seen.add(k2); out.push(o);
