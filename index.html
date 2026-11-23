@@ -118,6 +118,10 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .dur small{font-size:13px;font-weight:600}
 .dur span{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px}
 .chev{color:var(--muted);font-size:22px}
+.chain .alt{color:var(--muted);font-size:12px;margin:0 -2px}
+.dep .t .cb{color:#fff;font-size:12px}
+.dep .t .chain .w{font-size:12px}
+.altrow.on{background:color-mix(in srgb,var(--brand) 12%,transparent);border-radius:12px;padding-left:8px;padding-right:8px}
 .dchips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;scrollbar-width:none}
 .dchip{flex:none;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;font:inherit;color:var(--ink);cursor:pointer;text-align:left}
 .dchip span:last-child{font-size:13px;font-weight:700;line-height:1.2}
@@ -475,6 +479,8 @@ function raptor(origins,dests,t0,banned,opt){
   const dmap=new Float64Array(NSTOP).fill(-1), dlist=[];
   dests.forEach(({id,d})=>{ const s=SI[id]; if(s===undefined) return; const w=walkMin(d); if(dmap[s]<0||w<dmap[s]){ if(dmap[s]<0) dlist.push(s); dmap[s]=w; } });
   const lab=[new Map()]; let marked=[]; const mflag=new Uint8Array(NSTOP);
+  // Bir durağa (o turdaki etikete göre) yürünen mesafe: evden ya da aktarma yürüyüşü; araçtan inilmişse 0
+  const walkAt=(s,r)=>{ const L=lab[r]&&lab[r].get(s); return !L?1e9:(L.o||L.wk)?L.m:0; };
   let bestT=INF; const upd=(s,t)=>{ const w=dmap[s]; if(w>=0&&t+w<bestT) bestT=t+w; };
   origins.forEach(({id,d})=>{ const s=SI[id]; if(s===undefined) return; const t=t0+walkMin(d);
     if(t<best[s]){ best[s]=t; pT[s]=t; pK[s]=0; lab[0].set(s,{o:true,t,m:Math.round(d),w:walkMin(d)}); if(!mflag[s]){mflag[s]=1;marked.push(s);} upd(s,t);} });
@@ -488,7 +494,7 @@ function raptor(origins,dests,t0,banned,opt){
     marked=[];
     Q.forEach((p0,key)=>{
       const li=Math.floor(key/1000), di=key%1000, x=LINES[li].dir[di], deps=depsToday(x), si=x.si, oi=x.oi, n=si.length;
-      let trip=-1, bpos=-1, bstop=-1, bk=0;
+      let trip=-1, bpos=-1, bstop=-1, bk=0, bwalk=1e9;
       for(let i=p0;i<n;i++){
         const s=si[i];
         if(trip>=0){
@@ -500,7 +506,10 @@ function raptor(origins,dests,t0,banned,opt){
           // daha erken bir sefere binilebilir mi?
           const target=pt+(k>1?1:0)-oi[i]; let lo=0,hi=deps.length;
           while(lo<hi){const m=(lo+hi)>>1; if(deps[m]<target) lo=m+1; else hi=m;}
-          if(lo<deps.length&&deps[lo]-t0+oi[i]<HOR&&(trip<0||deps[lo]<trip)){ trip=deps[lo]; bpos=i; bstop=s; bk=pK[s]; }
+          if(lo<deps.length&&deps[lo]-t0+oi[i]<HOR&&(trip<0||deps[lo]<trip)){ trip=deps[lo]; bpos=i; bstop=s; bk=pK[s]; bwalk=walkAt(s,pK[s]); }
+          // Aynı araca bu duraktan da yetişiliyorsa ve buraya daha az yürünüyorsa (evden ya da aktarmada): buradan bin.
+          // Aynı sayıda araçla gelinmiş olmalı (bk eşit), yoksa yolculuk değişir.
+          else if(lo<deps.length&&deps[lo]===trip&&pK[s]===bk){ const w=walkAt(s,bk); if(w<bwalk-30){ bpos=i; bstop=s; bwalk=w; } }
         }
       }
     });
@@ -566,7 +575,30 @@ function rank(all,now,limit){
   }
   top.sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave);
   const more=[...kept.filter(o=>!top.includes(o)),...other].sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave);
-  return {top,more:more.slice(0,limit-top.length)};
+  // Aynı yerden binilip aynı yerde inilen (farklı hatlı) seçenekleri tek kartta topla
+  const groups=groupPlans([...top,...more]);
+  const gTop=groups.filter(g=>top.includes(g)||g.alts.some(a=>top.includes(a))).slice(0,5);
+  const gMore=groups.filter(g=>!gTop.includes(g));
+  return {top:gTop,more:gMore.slice(0,limit-gTop.length)};
+}
+// İki seçenek aynı "güzergâh" mı: aynı sayıda araç, her ayakta biniş ve iniş durakları birbirine en fazla 250 m
+const sameRoute=(a,b)=>{
+  if(a.walk||b.walk||a.legs.length!==b.legs.length) return false;
+  return a.legs.every((g,i)=>{ const h=b.legs[i], x=LINES[g.li].dir[g.di], y=LINES[h.li].dir[h.di];
+    return hav(STOPS[x.s[g.from]].p,STOPS[y.s[h.from]].p)<250&&hav(STOPS[x.s[g.to]].p,STOPS[y.s[h.to]].p)<250; });
+};
+function groupPlans(list){
+  const groups=[];
+  for(const o of list){
+    const g=groups.find(g=>sameRoute(g,o)&&o.mt.dur<=g.mt.dur+40);
+    // aynı hat(lar) aynı saatte (sadece varyant farkı) tekrar eklenmesin
+    const sig=p=>p.legs.map(l=>LINES[l.li].b+"@"+fmt(l.board)).join(">");
+    if(g){ if(sig(g)!==sig(o)&&!g.alts.some(a=>sig(a)===sig(o))) g.alts.push(o);
+      (o.tags||[]).forEach(t=>{ if(!g.tags.includes(t)) g.tags.push(t); }); }
+    else { o.alts=[]; o.tags=o.tags||[]; groups.push(o); }
+  }
+  groups.forEach(g=>g.alts.sort((a,b)=>a.mt.leave-b.mt.leave));
+  return groups;
 }
 // Aktarmasız giden tüm hatlar: başlangıç durağından binip varış durağında inilebilen her hat-yön için sıradaki sefer
 function directLines(O,Dn,now){
@@ -709,13 +741,19 @@ function steps(o){
   out.push({k:"walk",from:p(o.w2.sid),to:o.w2.m?M.B:p(o.w2.sid),m:o.w2.m,dk:o.w2.w,t:last.end,txt:"Varış noktasına yürü"});
   return out;
 }
-const chain=o=>steps(o).map(s=>s.k==="walk"?(s.m>40?`<span class="w">🚶${s.dk}</span>`:""):`<span class="cb" style="background:${lc(s.Ln)}">${esc(s.Ln.b)}</span>`).filter(Boolean).join(`<span class="sep">›</span>`);
+const chain=(o,single)=>{ let ri=0; const all=[o,...(single?[]:(o.alts||[]))];
+  return steps(o).map(s=>{ if(s.k==="walk") return s.m>40?`<span class="w">🚶${s.dk}</span>`:"";
+    const i=ri++, seen=new Set(), Ls=[];
+    all.forEach(p=>{ const L=LINES[p.legs[i].li]; const k=L.b+"|"+L.t; if(!seen.has(k)){ seen.add(k); Ls.push(L);} });
+    return Ls.map(L=>`<span class="cb" style="background:${lc(L)}">${esc(L.b)}</span>`).join(`<span class="alt">/</span>`); }).filter(Boolean).join(`<span class="sep">›</span>`); };
 
 // Kısa, tıklanabilir seçenek kartları
 function planCard(o,k,now){
   const mt=o.mt||metrics(o), first=o.legs?o.legs[0]:null;
   const leaveTxt=mt.leave-now<=1?"Hemen çık":`Çıkış ${fmt(mt.leave)} · ${dk(mt.leave-now)} sonra`;
-  const sub=o.walk?`${o.m} m yürüyüş`:`${leaveTxt} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)}`;
+  let sub=o.walk?`${o.m} m yürüyüş`:`${leaveTxt} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)}`;
+  if(o.alts&&o.alts.length){ const ms=[o,...o.alts].sort((a,b)=>a.legs[0].board-b.legs[0].board).slice(0,4);
+    sub=`${o.alts.length+1} seçenek · ${ms.map(p=>`${esc(LINES[p.legs[0].li].b)} ${fmt(p.legs[0].board)}`).join(" · ")}`; }
   const tg=(o.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
   const meta=o.walk?"":` · 🚶 ${mt.walk>=1000?(mt.walk/1000).toFixed(1)+" km":mt.walk+" m"}`;
   return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o)}</div><div class="sub">${sub}${meta}</div></div>
@@ -785,7 +823,9 @@ function openPlan(k){
   try{ map.fitBounds(L.featureGroup(routeLayer.getLayers().concat([mkA,mkB].filter(Boolean))).getBounds().pad(.12)); }catch(e){}
   drawVehicles();
   const d=document.getElementById("detail");
-  d.innerHTML=`    <div class="dhead"><div><div class="chain">${chain(o)}</div><div class="sub">${esc(M.Aname)} → ${esc(M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>çıkış ${fmt((o.mt||metrics(o)).leave)} · varış ${fmt(o.arr)}</span></div></div>
+  d.innerHTML=`    <div class="dhead"><div><div class="chain">${chain(o,true)}</div><div class="sub">${esc(M.Aname)} → ${esc(M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>çıkış ${fmt((o.mt||metrics(o)).leave)} · varış ${fmt(o.arr)}</span></div></div>
+    ${(o.alts&&o.alts.length)?`<h3 class="sec" style="margin-top:0">Aynı güzergâhta ${o.alts.length+1} seçenek</h3><div class="steps" style="margin-bottom:12px">${[o,...o.alts].map((p,j)=>{const m=p.mt||metrics(p);
+      return `<div class="dep altrow ${j===0?"on":""}" data-alt="${k}:${j}"><div class="t"><div class="chain">${chain(p,true)}</div><span>Çıkış ${fmt(m.leave)} · biniş ${fmt(p.legs[0].board)} · varış ${fmt(p.arr)} · 🚶 ${m.walk} m</span></div><div class="m">${dk(m.dur)}<small>${j===0?"gösteriliyor":"seç"}</small></div></div>`;}).join("")}</div>`:""}
     <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname||"Başlangıç")}</b><span>${(o.mt||metrics(o)).leave-now<=1?"Hemen yola çık":"Yola çık: "+fmt((o.mt||metrics(o)).leave)+" ("+dk((o.mt||metrics(o)).leave-now)+" sonra)"}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
       <div class="step s-walk"><div class="ic"><span>🚶</span></div><div class="tx"><b>${esc(s.txt)}</b><span data-wk="${s.from.join()+";"+s.to.join()}">${s.m} m · ~${dk(s.dk)}</span></div><div class="tm"></div></div>`:""):`
       <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb" style="background:${lc(s.Ln)}">${esc(s.Ln.b)}</span></div>
@@ -898,9 +938,11 @@ function render(){
 function openLine(id,d){ hist.push({line:state.line,stop:state.stop,dir:state.dir,tab:state.tab}); go({line:id,stop:null,dir:+(d||0)}); }
 function openStop(n){ hist.push({line:state.line,stop:state.stop,dir:state.dir,tab:state.tab}); go({stop:n,line:null}); }
 document.addEventListener("click",e=>{
-  const el=e.target.closest("[data-direct],[data-deep],[data-pick],[data-open],[data-dback],[data-fh],[data-fd],[data-f],[data-dir],[data-back],[data-line],[data-stop],[data-goto],[data-pop-stop]"); if(!el) return;
+  const el=e.target.closest("[data-alt],[data-direct],[data-deep],[data-pick],[data-open],[data-dback],[data-fh],[data-fd],[data-f],[data-dir],[data-back],[data-line],[data-stop],[data-goto],[data-pop-stop]"); if(!el) return;
   const ds=el.dataset;
   if(ds.pick){ const ll=ds.sid?STOPS[ds.sid].p:ds.ll.split(",").map(Number); return setEnd(ds.pick,ll,ds.sid?STOPS[ds.sid].n:"Haritada seçilen nokta"); }
+  if(ds.alt){ const [k,j]=ds.alt.split(":").map(Number); if(j===0) return; const g=M.plans[k], all=[g,...g.alts], c=all[j];
+    c.alts=all.filter(x=>x!==c); c.tags=g.tags; g.alts=[]; M.plans[k]=c; return openPlan(k); }
   if(ds.direct!==undefined){ const o=M.direct[+ds.direct]; M.plans.push(o); return openPlan(M.plans.length-1); }
   if(el.hasAttribute("data-deep")){ M.deep="run"; renderPlans(); return setTimeout(deepPlan,30); }
   if(ds.open!==undefined) return openPlan(+ds.open);
