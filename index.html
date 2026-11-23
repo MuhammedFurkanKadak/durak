@@ -118,6 +118,8 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .dur small{font-size:13px;font-weight:600}
 .dur span{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px}
 .chev{color:var(--muted);font-size:22px}
+.tags{display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--brand) 22%,transparent);color:var(--ink)}
 .dhead{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:10px}
 .dhead>div:first-child{flex:1;min-width:0}
 .steps{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:6px 14px}
@@ -212,6 +214,10 @@ async function loadData(){
     (GRID[gk(la,lo)]=GRID[gk(la,lo)]||[]).push(id);
   }
   NAMES=Object.keys(BYNAME).sort((a,b)=>a.localeCompare(b,"tr"));
+  // Konumu bilinmeyen durakları hatlardan çıkar
+  LINES.forEach(L=>L.dir.forEach(x=>{ const keep=x.s.map((s,i)=>STOPS[s]?i:-1).filter(i=>i>=0); if(keep.length<x.s.length){ x.o=keep.map(i=>x.o[i]); x.s=keep.map(i=>x.s[i]); } }));
+  LINES.forEach(L=>L.dir=L.dir.filter(x=>x.s.length>=2));
+  LINES=LINES.filter(L=>L.dir.length);
   LINES.forEach((L,li)=>{ L._n=norm(L.b+" "+L.n+" "+L.a); L.dir.forEach((x,di)=>x.s.forEach((sid,pos)=>{(IDX[sid]=IDX[sid]||[]).push([li,di,pos]);})); });
 }
 function near(p,r){
@@ -404,8 +410,8 @@ function askLocation(cb){
 
 // ================= ROTA HESABI (RAPTOR) =================
 // Tur tur arama: her turda bir araca daha binilir (en fazla 4 araç = 3 aktarma).
-const MAX_LEGS=4, XFER_R=350;
-function raptor(origins,dests,t0,banned){
+function raptor(origins,dests,t0,banned,opt){
+  const MAX_LEGS=(opt&&opt.legs)||4, XFER_R=(opt&&opt.xfer)||500, HOR=(opt&&opt.hor)||180;
   const best={}, lab=[{}], marked=new Set();
   origins.forEach(({id,d})=>{ const t=t0+walkMin(d); if(best[id]===undefined||t<best[id]){ best[id]=t; lab[0][id]={o:true,t,m:Math.round(d),w:walkMin(d)}; marked.add(id);} });
   const dmap={}; dests.forEach(({id,d})=>{ dmap[id]=Math.min(dmap[id]??1e9,walkMin(d)); });
@@ -434,7 +440,7 @@ function raptor(origins,dests,t0,banned){
           // daha erken bir sefere binilebilir mi?
           const target=pt+(k>1?1:0)-x.o[i]; let lo=0,hi=deps.length;
           while(lo<hi){const m=(lo+hi)>>1; if(deps[m]<target) lo=m+1; else hi=m;}
-          if(lo<deps.length&&deps[lo]-t0+x.o[i]<180&&(trip===null||deps[lo]<trip)){ trip=deps[lo]; bpos=i; bstop=s; bk=pv[1]; }
+          if(lo<deps.length&&deps[lo]-t0+x.o[i]<HOR&&(trip===null||deps[lo]<trip)){ trip=deps[lo]; bpos=i; bstop=s; bk=pv[1]; }
         }
       }
     });
@@ -463,32 +469,79 @@ function rebuild(lab,k,s,arr,dmap,dests){
   }
   return {legs,w1,w2,arr};
 }
-function plan(A,B,Aids,Bids){
-  const now=nowMin(), out=[], dAB=hav(A,B);
-  // Durak adı seçildiyse o addaki tüm duraklar (yürüme yok), yoksa çevredeki duraklar
-  const O=Aids?Aids.map(id=>({id,d:0})):near(A,900), Dn=Bids?Bids.map(id=>({id,d:0})):near(B,900);
-  if(dAB<2500) out.push({walk:true,m:Math.round(dAB),arr:now+walkMin(dAB)});
-  let res=raptor(O,Dn,now);
-  // Çeşitlilik: en iyi seçeneğin en uzun ayağındaki hattı yasaklayıp bir kez daha ara
-  if(res.length){
-    const b=res.reduce((a,c)=>c.arr<a.arr?c:a), lg=b.legs.reduce((a,c)=>(c.to-c.from)>(a.to-a.from)?c:a);
-    res=res.concat(raptor(O,Dn,now,new Set([lg.li])));
-  }
-  // Aktarma sayısı artarken en az 5 dk kazandırmayanları ele, aynılarını tekrar gösterme
-  res.sort((a,b)=>a.arr-b.arr||a.legs.length-b.legs.length);
-  const seen=new Set();
-  for(const o of res){
-    const key=o.legs.map(l=>l.li).join(">"); if(seen.has(key)) continue;
-    if(out.some(p=>!p.walk&&p.legs.length<o.legs.length&&p.arr<=o.arr+5)) continue;
-    seen.add(key); out.push(o);
-  }
-  const nl=o=>o.walk?0:o.legs.length;
-  // Daha az aktarmalı bir seçenek en fazla 5 dk geç varıyorsa, çok aktarmalıyı gösterme
-  return out.filter(o=>!out.some(q=>q!==o&&nl(q)<nl(o)&&q.arr<=o.arr+5)).sort((a,b)=>a.arr-b.arr).slice(0,4);
+// Seçeneğin ölçütleri: varış, araç sayısı, toplam yürüme
+function metrics(o){
+  if(o.walk) return {arr:o.arr,legs:0,walk:o.m};
+  return {arr:o.arr,legs:o.legs.length,walk:o.w1.m+o.w2.m+o.legs.reduce((s,l)=>s+(l.tw||0),0)};
 }
-
+const planKey=o=>o.walk?"walk":o.legs.map(l=>l.li).join(">")+"@"+Math.round(o.legs[0].board);
+// Seçenekleri sırala: Pareto (her açıdan daha kötüsü olmayanlar) önce, etiketli
+function rank(all,now,limit){
+  const byKey={};
+  all.forEach(o=>{ o.mt=o.mt||metrics(o); const k=planKey(o); const q=byKey[k]; if(!q||o.mt.walk<q.mt.walk) byKey[k]=o; });
+  const cand=Object.values(byKey).filter(o=>o.mt.arr-now<300&&o.mt.walk<6000)
+    .sort((a,b)=>a.mt.arr-b.mt.arr||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
+  const kept=[], other=[];
+  for(const o of cand){
+    o.tags=[];
+    (kept.some(q=>q.mt.arr<=o.mt.arr+3&&q.mt.legs<=o.mt.legs&&q.mt.walk<=o.mt.walk+150)?other:kept).push(o);
+  }
+  const tag=(f,label)=>{ if(!kept.length) return; const v=Math.min(...kept.map(f)); kept.filter(o=>f(o)===v).sort((a,b)=>a.mt.arr-b.mt.arr)[0].tags.push(label); };
+  tag(o=>o.mt.arr,"En hızlı");
+  if(kept.length>1){ tag(o=>o.walk?99:o.mt.legs,"En az aktarma"); tag(o=>o.mt.walk,"En az yürüme"); }
+  const tagged=kept.filter(o=>o.tags.length), rest=kept.filter(o=>!o.tags.length);
+  const top=[...tagged,...rest].slice(0,5).sort((a,b)=>a.mt.arr-b.mt.arr);
+  const more=[...kept.filter(o=>!top.includes(o)),...other].sort((a,b)=>a.mt.arr-b.mt.arr);
+  return {top,more:more.slice(0,limit-top.length)};
+}
+// Hızlı arama: birkaç yürüme sınırı + ana hat yasaklı tekrar
+function plan(A,B,Aids,Bids){
+  const now=nowMin(), all=[], dAB=hav(A,B);
+  if(dAB<3000) all.push({walk:true,m:Math.round(dAB),arr:now+walkMin(dAB)});
+  const radii=(Aids&&Bids)?[0]:[400,900,1500];
+  for(const r of radii){
+    const O=Aids?Aids.map(id=>({id,d:0})):near(A,r), Dn=Bids?Bids.map(id=>({id,d:0})):near(B,r);
+    if(!O.length||!Dn.length) continue;
+    const res=raptor(O,Dn,now); all.push(...res);
+    if(res.length){
+      const best=res.reduce((x,c)=>c.arr<x.arr?c:x);
+      const main=best.legs.reduce((x,c)=>(c.to-c.from)>(x.to-x.from)?c:x);
+      all.push(...raptor(O,Dn,now,new Set([main.li])));
+      if(best.legs.length>1) all.push(...raptor(O,Dn,now,new Set(best.legs.map(l=>l.li))));
+    }
+  }
+  M.found=all;
+  return rank(all,now,5).top;
+}
+// Geniş arama: 2,5 km yürüme, 800 m aktarma, 6 araç, bulunan her hattı yasaklayıp tekrar, sonraki kalkışlar
+async function deepPlan(){
+  const now=nowMin(), all=[...(M.found||[])], opt={legs:6,xfer:800,hor:240}, run=M.runId=(M.runId||0)+1;
+  const yieldUI=()=>new Promise(r=>setTimeout(r,0));
+  const radii=(M.Aids&&M.Bids)?[0]:[300,600,1000,1500,2500];
+  let n=0; const total=radii.length*14+4;
+  const step=async()=>{ n++; if(n%3===0){ M.deepMsg=`Geniş arama… %${Math.min(99,Math.round(n/total*100))} · ${new Set(all.map(planKey)).size} seçenek`; renderPlans(); await yieldUI(); if(M.runId!==run) throw 0; } };
+  try{
+    for(const r of radii){
+      const O=M.Aids?M.Aids.map(id=>({id,d:0})):near(M.A,r), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):near(M.B,r);
+      if(!O.length||!Dn.length) continue;
+      const base=raptor(O,Dn,now,null,opt); all.push(...base); await step();
+      // bulunan her hattı tek tek yasakla
+      const lines=[...new Set(all.filter(o=>!o.walk).flatMap(o=>o.legs.map(l=>l.li)))].slice(0,12);
+      for(const li of lines){ all.push(...raptor(O,Dn,now,new Set([li]),opt)); await step(); }
+      // birkaç hattı birlikte yasakla (bambaşka güzergâhlar için)
+      if(lines.length>2){ all.push(...raptor(O,Dn,now,new Set(lines.slice(0,3)),opt)); await step(); }
+    }
+    // biraz sonra çıkarsan
+    const O=M.Aids?M.Aids.map(id=>({id,d:0})):near(M.A,900), Dn=M.Bids?M.Bids.map(id=>({id,d:0})):near(M.B,900);
+    for(const off of [10,20,30,45]){ all.push(...raptor(O,Dn,now+off,null,opt)); await step(); }
+  }catch(e){ return; }
+  if(M.runId!==run) return;
+  const r=rank(all,now,100);
+  M.plans=[...r.top,...r.more]; M.topCount=r.top.length; M.deep="done"; M.deepMsg=""; renderPlans();
+}
 function computePlans(){
-  M.plans=plan(M.A,M.B,M.Aids,M.Bids); M.sel=null; msg(""); showList(); renderPlans();
+  M.runId=(M.runId||0)+1; M.deep=null; M.deepMsg="";
+  M.plans=plan(M.A,M.B,M.Aids,M.Bids); M.topCount=M.plans.length; M.sel=null; msg(""); showList(); renderPlans();
   try{ map.fitBounds(L.latLngBounds([M.A,M.B]).pad(.25)); }catch(e){}
 }
 // Hattın gerçek güzergâhından iki durak arasını kes (yoksa duraklar arası düz çizgi)
@@ -522,16 +575,30 @@ function steps(o){
 const chain=o=>steps(o).map(s=>s.k==="walk"?(s.m>40?`<span class="w">🚶${s.dk}</span>`:""):`<span class="cb" style="background:${lc(s.Ln)}">${esc(s.Ln.b)}</span>`).filter(Boolean).join(`<span class="sep">›</span>`);
 
 // Kısa, tıklanabilir seçenek kartları
+function planCard(o,k,now){
+  const first=o.legs?o.legs[0]:null, dur=Math.round(o.arr-now);
+  const sub=o.walk?`${o.m} m yürüyüş`:`${fmt(first.board)} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)} · ${inMin(first.board)==="Şimdi"?"şimdi":inMin(first.board)+" sonra"}`;
+  const tg=(o.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
+  const meta=o.walk?"":` · 🚶 ${o.mt.walk>=1000?(o.mt.walk/1000).toFixed(1)+" km":o.mt.walk+" m"}`;
+  return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o)}</div><div class="sub">${sub}${meta}</div></div>
+    <div class="dur">${dur}<small> dk</small><span>${fmt(now)}–${fmt(o.arr)}</span></div><span class="chev">›</span></div>`;
+}
+// Kısa, tıklanabilir seçenek kartları
 function renderPlans(){
   const el=document.getElementById("plans"), now=nowMin();
   if(!M.plans){ el.innerHTML=""; return; }
-  if(!M.plans.length){ el.innerHTML=`<div class="empty">Bu iki nokta arasında en fazla 1 aktarmayla gidilebilen bir yol bulunamadı. İETT otobüsleri ve metrobüs eklenince seçenekler artacak.</div>`; return; }
-  el.innerHTML=`<h3 class="sec" style="margin-top:4px">Seçenekler</h3>`+M.plans.map((o,k)=>{
-    const first=o.legs?o.legs[0]:null, dur=Math.round(o.arr-now);
-    const sub=o.walk?`${o.m} m yürüyüş`:`${fmt(first.board)} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)} · ${inMin(first.board)==="Şimdi"?"şimdi":inMin(first.board)+" sonra"}`;
-    return `<div class="pcard" data-open="${k}"><div class="main"><div class="chain">${chain(o)}</div><div class="sub">${sub}</div></div>
-      <div class="dur">${dur}<small> dk</small><span>${fmt(now)}–${fmt(o.arr)}</span></div><span class="chev">›</span></div>`;
-  }).join("");
+  const top=M.plans.slice(0,M.topCount), more=M.plans.slice(M.topCount);
+  let html=M.plans.length?`<h3 class="sec" style="margin-top:4px">Seçenekler</h3>`+top.map((o,k)=>planCard(o,k,now)).join("")
+    :`<div class="empty">Hızlı aramada yol bulunamadı. Aşağıdan geniş arama yapabilirsin.</div>`;
+  if(M.deep==="done"){
+    html+=more.length?`<h3 class="sec">Diğer seçenekler (${more.length})</h3>`+more.map((o,i)=>planCard(o,M.topCount+i,now)).join("")
+      :`<div class="more">Geniş aramada başka seçenek çıkmadı.</div>`;
+  } else if(M.deep==="run"){
+    html+=`<div class="more">${esc(M.deepMsg||"Geniş arama…")}</div>`;
+  } else {
+    html+=`<button class="btn" style="width:100%;margin:4px 0 12px;background:var(--card);border:1px solid var(--line);color:var(--ink)" data-deep>🔎 Tüm seçenekleri göster (geniş arama)</button>`;
+  }
+  el.innerHTML=html;
 }
 function showList(){
   M.sel=null; routeLayer.clearLayers();
@@ -657,9 +724,10 @@ function render(){
 function openLine(id,d){ hist.push({line:state.line,stop:state.stop,dir:state.dir,tab:state.tab}); go({line:id,stop:null,dir:+(d||0)}); }
 function openStop(n){ hist.push({line:state.line,stop:state.stop,dir:state.dir,tab:state.tab}); go({stop:n,line:null}); }
 document.addEventListener("click",e=>{
-  const el=e.target.closest("[data-pick],[data-open],[data-dback],[data-fh],[data-fd],[data-f],[data-dir],[data-back],[data-line],[data-stop],[data-goto],[data-pop-stop]"); if(!el) return;
+  const el=e.target.closest("[data-deep],[data-pick],[data-open],[data-dback],[data-fh],[data-fd],[data-f],[data-dir],[data-back],[data-line],[data-stop],[data-goto],[data-pop-stop]"); if(!el) return;
   const ds=el.dataset;
   if(ds.pick){ const ll=ds.sid?STOPS[ds.sid].p:ds.ll.split(",").map(Number); return setEnd(ds.pick,ll,ds.sid?STOPS[ds.sid].n:"Haritada seçilen nokta"); }
+  if(el.hasAttribute("data-deep")){ M.deep="run"; renderPlans(); return setTimeout(deepPlan,30); }
   if(ds.open!==undefined) return openPlan(+ds.open);
   if(el.hasAttribute("data-dback")){ showList(); try{map.fitBounds(L.latLngBounds([M.A,M.B]).pad(.25));}catch(e){} return; }
   if(ds.popStop){ map.closePopup(); return openStop(ds.popStop); }
