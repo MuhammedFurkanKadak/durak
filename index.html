@@ -696,14 +696,6 @@ function planCard(o,k,now){
     <div class="dur">${dkBig(mt.dur)}<span>${fmt(mt.leave)}–${fmt(o.arr)}</span></div><span class="chev">›</span></div>`;
 }
 // Kısa, tıklanabilir seçenek kartları
-function planCard(o,k,now){
-  const first=o.legs?o.legs[0]:null, dur=Math.round(o.arr-now);
-  const sub=o.walk?`${o.m} m yürüyüş`:`${fmt(first.board)} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)} · ${inMin(first.board)==="Şimdi"?"şimdi":inMin(first.board)+" sonra"}`;
-  const tg=(o.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
-  const meta=o.walk?"":` · 🚶 ${o.mt.walk>=1000?(o.mt.walk/1000).toFixed(1)+" km":o.mt.walk+" m"}`;
-  return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o)}</div><div class="sub">${sub}${meta}</div></div>
-    <div class="dur">${dkBig(dur)}<span>${fmt(now)}–${fmt(o.arr)}</span></div><span class="chev">›</span></div>`;
-}
 // Kısa, tıklanabilir seçenek kartları
 function renderPlans(){
   const el=document.getElementById("plans"), now=nowMin();
