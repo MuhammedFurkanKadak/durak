@@ -162,6 +162,7 @@ const G=0.005, gk=(la,lo)=>Math.floor(la/G)+":"+Math.floor(lo/G);
 async function loadData(){
   const D=await (await fetch("data.json")).json();
   LINES=D.lines;
+  LINES.forEach(L=>{ if(L.t==="marmaray") L.b=L.b.replace(/^Marmaray/i,"MR"); });
   for(const [id,[n,la,lo]] of Object.entries(D.stops)){
     STOPS[id]={id,n,la,lo,p:[la,lo]};
     (BYNAME[n]=BYNAME[n]||[]).push(id);
@@ -232,6 +233,7 @@ function viewLine(){
     <button class="star ${isFav("h",L.id)?"on":""}" data-fh="${L.id}">${isFav("h",L.id)?"★":"☆"}</button></div>${seg}
     <div class="next">${nx.length?nx.map(t=>`<div><b>${inMin(t)}</b><span>${fmt(t)} kalkış</span></div>`).join(""):`<div><b>—</b><span>Bugün sefer kalmadı</span></div>`}</div>
   </div>
+  <h3 class="sec" style="margin-top:0">Duraklar · sıradaki geçiş saati</h3>
   <div class="stops" style="--c:${lc(L)}">${x.s.map((sid,pos)=>{
     const S=STOPS[sid]; if(!S) return ""; const t=nextAt(x,pos,now)[0];
     const others=linesAtName(S.n).filter(o=>o!==L).slice(0,6);
@@ -240,7 +242,8 @@ function viewLine(){
 
 function viewStops(){
   const q=norm(state.q);
-  const ns=q?NAMES.filter(n=>norm(n).includes(q)):NAMES;
+  const sc=n=>{const x=norm(n);return x===q?0:x.startsWith(q)?1:2;};
+  const ns=q?NAMES.filter(n=>norm(n).includes(q)).sort((a,b)=>sc(a)-sc(b)||a.length-b.length):NAMES;
   return `<div class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
   <input id="q" placeholder="Durak ara: Kadıköy, Taksim…" value="${esc(state.q)}" autocomplete="off"></div>
   <div class="list">${ns.slice(0,50).map(n=>`
@@ -376,12 +379,30 @@ function plan(A,B){
       }
     });
   });
-  const best={};
-  res.forEach(o=>{const k=o.walk?"walk":o.legs.map(l=>l.li).join(">"); if(!best[k]||o.arr<best[k].arr) best[k]=o;});
-  return Object.values(best).sort((a,b)=>a.arr-b.arr||(a.legs?.length||0)-(b.legs?.length||0)).slice(0,4);
+  // Aynı araca binip aynı sonuca varan seçeneklerden en sade olanı tut
+  const nl=o=>o.legs?o.legs.length:0;
+  res.sort((a,b)=>a.arr-b.arr||nl(a)-nl(b)||(a.w1?.w||0)-(b.w1?.w||0));
+  const seen=new Set(), out=[];
+  for(const o of res){
+    if(o.walk){ out.push(o); continue; }
+    const last=o.legs[o.legs.length-1], k1=last.li+"@"+Math.round(last.board), k2=o.legs.map(l=>l.li).join(">");
+    if(seen.has(k1)||seen.has(k2)) continue;
+    seen.add(k1); seen.add(k2); out.push(o);
+    if(out.length>=4) break;
+  }
+  return out;
 }
 function computePlans(){
   M.plans=(M.A&&M.B)?plan(M.A,M.B):null; M.sel=0; drawRoute(); renderPlans();
+}
+// Hattın gerçek güzergâhından iki durak arasını kes (yoksa duraklar arası düz çizgi)
+function legPath(x,from,to){
+  const pts=x.s.slice(from,to+1).map(s=>STOPS[s].p);
+  if(!x.g||x.g.length<2) return pts;
+  const ni=p=>{let bi=0,bd=1e18;x.g.forEach((q,i)=>{const d=(q[0]-p[0])**2+(q[1]-p[1])**2;if(d<bd){bd=d;bi=i;}});return bi;};
+  const a=ni(pts[0]), b=ni(pts[pts.length-1]);
+  if(b<=a) return pts;
+  return [pts[0],...x.g.slice(a,b+1),pts[pts.length-1]];
 }
 function drawRoute(){
   routeLayer.clearLayers(); const o=M.plans&&M.plans[M.sel]; if(!o) return drawVehicles();
@@ -390,7 +411,7 @@ function drawRoute(){
   else{
     dash(M.A,STOPS[o.w1.sid].p);
     o.legs.forEach((g,i)=>{const Ln=LINES[g.li],x=Ln.dir[g.di];
-      L.polyline(x.s.slice(g.from,g.to+1).map(s=>STOPS[s].p),{color:lc(Ln),weight:7,opacity:.95}).addTo(routeLayer);
+      L.polyline(legPath(x,g.from,g.to),{color:lc(Ln),weight:7,opacity:.95}).addTo(routeLayer);
       if(i>0){const prev=o.legs[i-1],px=LINES[prev.li].dir[prev.di];dash(STOPS[px.s[prev.to]].p,STOPS[x.s[g.from]].p);}
     });
     dash(STOPS[o.w2.sid].p,M.B);
@@ -418,7 +439,8 @@ function renderPlans(){
 const dq=document.getElementById("dq"), dsugg=document.getElementById("dsugg");
 dq.addEventListener("input",()=>{
   const q=norm(dq.value.trim()); if(q.length<2){dsugg.hidden=true;return;}
-  const r=NAMES.filter(n=>norm(n).includes(q)).slice(0,8);
+  const score=n=>{const x=norm(n);return x===q?0:x.startsWith(q)?1:2;};
+  const r=NAMES.filter(n=>norm(n).includes(q)).sort((a,b)=>score(a)-score(b)||a.length-b.length).slice(0,8);
   dsugg.innerHTML=r.map(n=>`<button data-sug="${esc(n)}">${esc(n)} <small>${linesAtName(n).slice(0,3).map(l=>esc(l.b)).join(", ")}</small></button>`).join("")||`<button disabled>Durak bulunamadı</button>`;
   dsugg.hidden=false;
 });
