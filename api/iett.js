@@ -36,13 +36,30 @@ module.exports = async (req, res) => {
     `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">` +
     `<soap:Body><${m} xmlns="http://tempuri.org/">${args}</${m}></soap:Body></soap:Envelope>`;
 
+  const why = (e) => [e.name, e.message, e.cause && (e.cause.code || e.cause.message)].filter(Boolean).join(" | ");
+  const tries = [];
+  let r = null;
+  // Önce https, olmazsa http ile dene
+  for (const base of [BASE, BASE.replace("https://", "http://")]) {
+    try {
+      r = await fetch(base + SERVICES[svc] + ".asmx", {
+        method: "POST",
+        headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: `"http://tempuri.org/${m}"` },
+        body: envelope,
+        signal: AbortSignal.timeout(12000),
+      });
+      tries.push(base.split(":")[0] + ": HTTP " + r.status);
+      break;
+    } catch (e) {
+      tries.push(base.split(":")[0] + ": " + why(e));
+      r = null;
+    }
+  }
+  if (!r) {
+    return res.status(502).json({ ok: false, error: "İBB servisine ulaşılamadı", detay: tries, bolge: process.env.VERCEL_REGION || "?" });
+  }
+
   try {
-    const r = await fetch(BASE + SERVICES[svc] + ".asmx", {
-      method: "POST",
-      headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: `"http://tempuri.org/${m}"` },
-      body: envelope,
-      signal: AbortSignal.timeout(20000),
-    });
     const xml = await r.text();
     const match = xml.match(new RegExp(`<${m}Result[^>]*>([\\s\\S]*?)</${m}Result>`));
     if (!match) {
