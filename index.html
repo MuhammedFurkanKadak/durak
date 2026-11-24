@@ -215,10 +215,12 @@ const mini=L=>`<i style="background:${lc(L)}">${esc(L.b.length>6?L.b.slice(0,6):
 // ================= VERİ =================
 let LINES=[], STOPS={}, IDX={}, BYNAME={}, NAMES=[], GRID={};
 const G=0.005, gk=(la,lo)=>Math.floor(la/G)+":"+Math.floor(lo/G);
+// Minibüs hat kodları (UKOME kodları; veride sadece hat adı var). Kodu bilinmeyenler "MB" kalır.
+const MBKOD={"7419":"C56","7115":"A37","7378":"C501","7282":"C315","7376":"C354","7142":"A45","7258":"C125","7391":"C58","7276":"C312","7152":"B46","7407":"BL103","7229":"C109","7377":"17","7150":"C301","7213":"A41","7114":"A04","7486":"A17","7277":"C313","7221":"C306","7389":"C57","7380":"C52","7197":"C72","7201":"A213","7200":"A208","7227":"C308","7212":"A42","7363":"BL100","7245":"C117","7392":"C64","7298":"C87","7292":"C82","7261":"C300","7105":"A26","7388":"C56","7176":"B43","7230":"C309","7302":"A30","7252":"C76","7189":"A27","7233":"C115","7117":"A39","7191":"A27","7257":"C78","7175":"B37","7307":"A36","7344":"C91","7220":"C305","7199":"A201","7136":"A200","7240":"C116","7107":"A02","7335":"C89","7375":"C351","7165":"B34","7262":"A216","7457":"A18","7294":"C83","7356":"C93","7390":"C58","7224":"A43","7271":"A11","27208":"C311","27207":"C311","7263":"A34","7238":"C115","7373":"C311","7234":"C310","7387":"C56","7304":"A30","7442":"A28","7108":"A03","7295":"C84","7239":"C311","7266":"A19","7395":"C65","7455":"A19","7110":"A03","7116":"A38","7253":"C77","7519":"C71","7255":"C77","7119":"A39","7286":"C80","7210":"A72","27353":"BL401","27206":"C315","7281":"C314","7347":"C91","7202":"A215","7301":"C88","7194":"C71","7396":"C65","7198":"A73","7174":"C71","7300":"A24","7403":"C70","7167":"B34","7171":"B35","7357":"C93","7402":"C70","7196":"A71","7162":"B33","7180":"B43","7242":"C116","7399":"C67","7293":"A24","7326":"A24","7489":"C86","7259":"C81","7297":"C84","7514":"B40","7272":"A11","7383":"C55","7284":"C317","7343":"C90","7313":"A32","7246":"C75","7209":"C74","7219":"C304","7327":"C310","7379":"C51","7325":"A34","7433":"C93","7247":"C76","7400":"C70","7480":"C70","7367":"BL401","7289":"C80","7398":"C56","7251":"C124","7256":"C124","7250":"C118","7397":"C66","7303":"A26","7185":"A26","7309":"A31","7296":"A31","7360":"BL400","7364":"BL400","7361":"A29","7369":"A29","7350":"A32"};
 async function loadData(){
   const D=await (await fetch("data.json")).json();
   LINES=D.lines;
-  LINES.forEach(L=>{ if(L.t==="marmaray") L.b=L.b.replace(/^Marmaray/i,"MR"); });
+  LINES.forEach(L=>{ if(L.t==="marmaray") L.b=L.b.replace(/^Marmaray/i,"MR"); if(L.t==="minibus"&&MBKOD[L.id]) L.b=MBKOD[L.id]; if(L.id==="i17") L.t="minibus"; /* İETT listesindeki 17 Pendik–Kadıköy de minibüs */ });
   for(const [id,[n,la,lo]] of Object.entries(D.stops)){
     STOPS[id]={id,n,la,lo,p:[la,lo]};
     (BYNAME[n]=BYNAME[n]||[]).push(id);
@@ -563,7 +565,7 @@ function legVariants(o,now){
       if(i===0){ w1m=(M.Aids&&M.Aids.includes(b))?0:hav(A,P(b)); if(w1m>o.w1.m+250) continue; ready=now+walkMin(w1m); }
       else { twm=prevStop===b?0:hav(P(prevStop),P(b)); if(twm>Math.max(g.tw||0,0)+250||twm>800) continue; ready=prevArr+(twm?walkMin(twm):0)+1; }
       for(const [li,di,pos] of (IDX[b]||[])){
-        const Ln=LINES[li]; if(Ln.b===Lb) continue; const x=Ln.dir[di];
+        const Ln=LINES[li]; if(li===g.li||(Ln.b===Lb&&Ln.b!=="MB"&&Ln.b!=="DM")) continue; const x=Ln.dir[di];
         let q=-1; for(let j=pos+1;j<x.s.length;j++) if(aC[x.s[j]]!==undefined){ q=j; break; }
         if(q<0) continue;
         const ride=x.o[q]-x.o[pos], a=x.s[q]; let b0, w2m=0, tw2=0, arr=o.arr;
