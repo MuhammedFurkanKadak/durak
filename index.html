@@ -202,6 +202,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
     <button class="themeb" id="themeb" aria-label="Gece moduna geç"></button>
   </header>
   <div class="inst" id="inst" hidden></div>
+  <div class="note">Veri: İBB Açık Veri (İETT otobüs ve metrobüs, metro, Marmaray, tramvay, vapur, minibüs, dolmuş). Saatler tarifeye göredir, araç konumları tahminidir.</div>
   <main id="app"><div class="loading">Hatlar yükleniyor…</div></main>
   <section id="mapview" hidden>
     <div id="rsearch">
@@ -352,9 +353,8 @@ let dayKey="";
 function depsToday(x){
   const d=new Date(), k=d.toDateString();
   if(x._k===k) return x._t;
-  const b=1<<((d.getDay()+6)%7), yb=1<<((d.getDay()+5)%7), tb=1<<(d.getDay()%7), a=new Set();
-  // dün gece yarısını geçenler + bugün + yarın sabah (gece arayınca ilk sabah seferi bulunsun)
-  x.d.forEach(([m,v])=>{ if(m&b) v.forEach(t=>a.add(t)); if(m&yb) v.forEach(t=>{if(t>=1440)a.add(t-1440)}); if(m&tb) v.forEach(t=>{if(t<720)a.add(t+1440)}); });
+  const b=1<<((d.getDay()+6)%7), yb=1<<((d.getDay()+5)%7), a=new Set();
+  x.d.forEach(([m,v])=>{ if(m&b) v.forEach(t=>a.add(t)); if(m&yb) v.forEach(t=>{if(t>=1440)a.add(t-1440)}); });
   x._t=[...a].sort((p,q)=>p-q); x._k=k; return x._t;
 }
 // pos durağından 'from' dakikasından sonra geçen ilk n araç
@@ -686,13 +686,8 @@ function rank(all,now,limit){
   const byKey={};
   // Aynı hat dizisi: en kısa süreni, eşitse en erken çıkanı tut
   all.forEach(o=>{ o.mt=metrics(o); const k=o.walk?"walk":o.legs.map(l=>l.li).join(">"); const q=byKey[k];
-    if(!q||o.mt.dur<q.mt.dur-1||(Math.abs(o.mt.dur-q.mt.dur)<=1&&o.mt.leave<q.mt.leave)) byKey[k]=o;
-    // aynı hat dizisinin en erken varanı da kalsın ("En erken varış" kaybolmasın)
-    if(o.mt.leave>=now-1){ const qa=byKey["@"+k]; if(!qa||o.arr<qa.arr-0.5||(Math.abs(o.arr-qa.arr)<=0.5&&o.mt.dur<qa.mt.dur)) byKey["@"+k]=o; } });
-  for(const k in byKey) if(k[0]==="@"&&byKey[k.slice(1)]===byKey[k]) delete byKey[k];
-  // Aynı hattan inip yine aynı hatta binmek anlamsız ("araçta kal"): ele
-  const sameHop=o=>!o.walk&&o.legs.some((l,i)=>i>0&&LINES[l.li].b===LINES[o.legs[i-1].li].b&&LINES[l.li].b!=="MB"&&LINES[l.li].b!=="DM");
-  const cand=Object.values(byKey).filter(o=>!sameHop(o)&&o.mt.leave>=now-1&&o.mt.leave-now<=480&&o.mt.walk<6000)
+    if(!q||o.mt.dur<q.mt.dur-1||(Math.abs(o.mt.dur-q.mt.dur)<=1&&o.mt.leave<q.mt.leave)) byKey[k]=o; });
+  const cand=Object.values(byKey).filter(o=>o.mt.leave>=now-1&&o.mt.leave-now<=480&&o.mt.walk<6000)
     .sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
   const kept=[], other=[];
   for(const o of cand){
@@ -786,7 +781,7 @@ function planStages(A,B,Aids,Bids){
       if(bestNow>now+60) all.push(...raptor(get("A","gece"),get("B","gece"),now,null,{hor:300,full:true})); },
     // Gece ya da şu an makul sefer yoksa: sonraki çıkışlar ve sabah ilk seferleri (05:00–06:30), az/orta yürüme modlarıyla
     ()=>{ const hh=now%1440, soon=all.some(o=>!o.walk&&o.legs[0].board-now<=60), starts=[];
-      if(hh<300||!soon){ starts.push(now+30,now+60,now+120); if(hh<300) [300,330,360,390].forEach(t=>starts.push(now-hh+t)); else if(hh>=1200) [300,330,360,390].forEach(t=>starts.push(now-hh+1440+t)); }
+      if(hh<300||!soon){ starts.push(now+30,now+60,now+120); if(hh<300) [300,330,360,390].forEach(t=>starts.push(now-hh+t)); }
       for(const t0 of starts) for(const [ma,mb] of [["orta","orta"],["az","orta"],["orta","az"]]){
         const O=get("A",ma), Dn=get("B",mb); if(!O.length||!Dn.length) continue;
         let cur=raptor(O,Dn,t0,null,{hor:120}).filter(o=>o.legs[0].board>=t0); all.push(...cur);
