@@ -43,6 +43,18 @@ header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:
 .inst b{display:block;font-size:14px}
 .inst .go{margin-left:auto;border:0;border-radius:10px;padding:9px 12px;background:var(--brand);color:var(--brand-ink);font:700 13px Inter,system-ui,sans-serif;cursor:pointer;flex:none}
 .inst .x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;flex:none}
+.guide{position:fixed;inset:0;background:rgba(5,10,20,.55);z-index:5000;display:flex;align-items:flex-end;justify-content:center;padding:12px 12px calc(70px + env(safe-area-inset-bottom))}
+.gbox{position:relative;background:var(--card);color:var(--ink);border-radius:20px;padding:18px 18px 14px;max-width:440px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.gbox p{font-size:14px;color:var(--muted);margin-top:10px}
+.gbox ol{list-style:none;margin-top:14px;display:flex;flex-direction:column;gap:12px}
+.gbox li{display:flex;align-items:center;gap:12px;font-size:15px;line-height:1.35}
+.gn{width:26px;height:26px;border-radius:50%;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}
+.gi{min-width:44px;height:44px;padding:0 6px;border-radius:12px;background:var(--bg);border:1px solid var(--line);display:grid;place-items:center;color:var(--brand);flex:none}
+.gx{position:absolute;top:8px;right:10px;border:0;background:none;font-size:26px;color:var(--muted);cursor:pointer;width:44px;height:44px}
+.gcopy{margin-top:12px;width:100%;border:0;border-radius:12px;padding:12px;background:var(--brand);color:var(--brand-ink);font:700 15px Inter,system-ui,sans-serif;cursor:pointer}
+.gs{font-size:12.5px!important}
+.garrow{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:40px;font-weight:800;color:#fff;animation:gb 1s ease-in-out infinite}
+@keyframes gb{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
 .themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
 .logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -238,24 +250,51 @@ if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.se
 (function(){
   const el=document.getElementById("inst"); if(!el) return;
   const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
-  let dismissed=false; try{ dismissed=localStorage.getItem("durak-inst")==="1"; }catch(e){}
+  let dismissed=false; try{ dismissed=localStorage.getItem("durak-inst2")==="1"; }catch(e){}
   if(standalone||dismissed) return;
-  const close=()=>{ el.hidden=true; try{ localStorage.setItem("durak-inst","1"); }catch(e){} };
-  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const close=()=>{ el.hidden=true; try{ localStorage.setItem("durak-inst2","1"); }catch(e){} };
+  const ua=navigator.userAgent, ios=/iphone|ipad|ipod/i.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+  const inApp=/Instagram|FBAN|FBAV|Twitter|Line\/|WhatsApp|GSA\//i.test(ua), iosChrome=/CriOS|FxiOS|EdgiOS/.test(ua);
   const ic='<img src="/icons/icon-192.png" alt="" width="40" height="40" style="border-radius:10px;flex:none">';
-  if(ios){
-    el.innerHTML=`${ic}<div><b>Durak'ı uygulama olarak ekle</b>Safari'de <b style="display:inline">Paylaş</b> ⬆︎ → <b style="display:inline">Ana Ekrana Ekle</b></div><button class="x" aria-label="Kapat">×</button>`;
-    el.hidden=false;
-  }
-  window.addEventListener("beforeinstallprompt",e=>{
-    e.preventDefault(); const ev=e;
-    el.innerHTML=`${ic}<div><b>Durak'ı telefona yükle</b>Ana ekrandan uygulama gibi aç</div><button class="go">Yükle</button><button class="x" aria-label="Kapat">×</button>`;
-    el.hidden=false;
-    el.querySelector(".go").onclick=async()=>{ ev.prompt(); try{ await ev.userChoice; }catch(_){} el.hidden=true; };
-    el.querySelector(".x").onclick=close;
+  let promptEv=null;
+  const show=()=>{ el.innerHTML=`${ic}<div><b>Durak'ı telefona yükle</b>Ana ekrandan uygulama gibi aç</div><button class="go" id="instgo">Yükle</button><button class="x" aria-label="Kapat">×</button>`; el.hidden=false; };
+  show();
+  window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); promptEv=e; });
+  el.addEventListener("click",async e=>{
+    if(e.target.classList.contains("x")) return close();
+    if(e.target.id!=="instgo") return;
+    if(promptEv){ promptEv.prompt(); try{ await promptEv.userChoice; }catch(_){} promptEv=null; return; }
+    openGuide();
   });
-  el.addEventListener("click",e=>{ if(e.target.classList.contains("x")) close(); });
   window.addEventListener("appinstalled",()=>{ el.hidden=true; });
+  // Adım adım kurulum rehberi (iPhone'da sitenin kendisi kurulum başlatamaz; Safari'nin menüsünden yapılır)
+  const SHARE='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+  const DOTS='<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+  const PLUS='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+  const KEBAB='<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+  function openGuide(){
+    let steps, top="", arrow="";
+    if(inApp){
+      top=`<p>Bu sayfa bir uygulamanın (Instagram, WhatsApp…) içinde açılmış. Kurmak için önce ${ios?"Safari":"Chrome"}'da açman gerekiyor.</p>`;
+      steps=[[KEBAB,`Sağ üstteki <b>⋯</b> menüsüne dokun`],[SHARE,`<b>${ios?"Safari'de Aç":"Tarayıcıda aç"}</b>'ı seç`],[PLUS,"Açılan sayfada yine <b>Yükle</b>'ye bas"]];
+    } else if(ios){
+      steps=iosChrome
+        ?[[SHARE,"Adres çubuğunun sağındaki <b>Paylaş</b> simgesine dokun"],[PLUS,"Listeden <b>Ana Ekrana Ekle</b>'yi seç"],[`<b style="font-size:15px">Ekle</b>`,"Sağ üstte <b>Ekle</b>'ye dokun"]]
+        :[[`<span style="display:flex;gap:6px">${SHARE}${DOTS}</span>`,"Ekranın en altındaki <b>Paylaş</b> simgesine dokun. Görmüyorsan önce <b>⋯</b>'ye, sonra <b>Paylaş</b>'a dokun"],[PLUS,"Listeyi biraz kaydır, <b>Ana Ekrana Ekle</b>'yi seç"],[`<b style="font-size:15px">Ekle</b>`,"Sağ üstte <b>Ekle</b>'ye dokun. Durak ikonu ana ekranına gelir"]];
+      if(!iosChrome) arrow='<div class="garrow" aria-hidden="true">↓</div>';
+    } else {
+      steps=[[KEBAB,"Chrome'un sağ üstündeki <b>⋮</b> menüsüne dokun"],[PLUS,"<b>Uygulamayı yükle</b> ya da <b>Ana ekrana ekle</b>'yi seç"],[`<b style="font-size:15px">Yükle</b>`,"Çıkan pencerede <b>Yükle</b>'ye dokun"]];
+    }
+    const g=document.createElement("div"); g.className="guide";
+    g.innerHTML=`<div class="gbox" role="dialog" aria-label="Durak'ı telefona yükle"><button class="gx" aria-label="Kapat">×</button>
+      <div style="display:flex;gap:10px;align-items:center">${ic}<b style="font-size:18px">Durak'ı ana ekrana ekle</b></div>${top}
+      <ol>${steps.map(([i,t],n)=>`<li><span class="gn">${n+1}</span><span class="gi">${i}</span><span>${t}</span></li>`).join("")}</ol>
+      ${inApp?`<button class="gcopy">Linki kopyala</button>`:""}
+      <p class="gs">Kurduktan sonra Durak'ı ana ekrandaki ikondan aç: tam ekran açılır, internetsiz de çalışır.</p></div>${arrow}`;
+    document.body.appendChild(g);
+    g.addEventListener("click",e=>{ if(e.target===g||e.target.classList.contains("gx")) g.remove();
+      if(e.target.classList.contains("gcopy")){ try{ navigator.clipboard.writeText(location.origin); e.target.textContent="Kopyalandı ✓"; }catch(_){} } });
+  }
 })();
 // ================= GÜNDÜZ / GECE MODU =================
 const SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
