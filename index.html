@@ -6,6 +6,14 @@
 <title>Durak – İstanbul Toplu Taşıma</title>
 <meta name="description" content="Reklamsız İstanbul toplu taşıma: metro, Marmaray, tramvay, vapur, minibüs ve dolmuş hatları, sefer saatleri ve nasıl giderim.">
 <meta name="theme-color" content="#1f4fd8">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Durak">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("durak-tema")==="dark"?"dark":"light"}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -30,7 +38,11 @@
 html,body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
 body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(76px + env(safe-area-inset-bottom)) env(safe-area-inset-left);min-height:100vh}
 .wrap{max-width:640px;margin:0 auto;padding:12px 16px}
-header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:16px 16px 18px;background:var(--hdrbg);color:var(--hdrink);box-shadow:0 0 0 100vmax var(--hdrbg);clip-path:inset(0 -100vmax)}
+header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:16px 16px 18px;background:var(--hdrbg);color:var(--hdrink);box-shadow:0 0 0 100vmax var(--hdrbg);clip-path:inset(-100vmax -100vmax 0 -100vmax)}
+.inst{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13.5px}
+.inst b{display:block;font-size:14px}
+.inst .go{margin-left:auto;border:0;border-radius:10px;padding:9px 12px;background:var(--brand);color:var(--brand-ink);font:700 13px Inter,system-ui,sans-serif;cursor:pointer;flex:none}
+.inst .x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;flex:none}
 .themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
 .logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -189,7 +201,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
     <div><h1>Durak</h1><small>İstanbul toplu taşıma · reklamsız</small></div>
     <button class="themeb" id="themeb" aria-label="Gece moduna geç"></button>
   </header>
-  <div class="note">Veri: İBB Açık Veri (İETT otobüs ve metrobüs, metro, Marmaray, tramvay, vapur, minibüs, dolmuş). Saatler tarifeye göredir, araç konumları tahminidir.</div>
+  <div class="inst" id="inst" hidden></div>
   <main id="app"><div class="loading">Hatlar yükleniyor…</div></main>
   <section id="mapview" hidden>
     <div id="rsearch">
@@ -220,6 +232,31 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 
+
+// ================= UYGULAMA OLARAK YÜKLEME (PWA) =================
+if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+(function(){
+  const el=document.getElementById("inst"); if(!el) return;
+  const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+  let dismissed=false; try{ dismissed=localStorage.getItem("durak-inst")==="1"; }catch(e){}
+  if(standalone||dismissed) return;
+  const close=()=>{ el.hidden=true; try{ localStorage.setItem("durak-inst","1"); }catch(e){} };
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const ic='<img src="/icons/icon-192.png" alt="" width="40" height="40" style="border-radius:10px;flex:none">';
+  if(ios){
+    el.innerHTML=`${ic}<div><b>Durak'ı uygulama olarak ekle</b>Safari'de <b style="display:inline">Paylaş</b> ⬆︎ → <b style="display:inline">Ana Ekrana Ekle</b></div><button class="x" aria-label="Kapat">×</button>`;
+    el.hidden=false;
+  }
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault(); const ev=e;
+    el.innerHTML=`${ic}<div><b>Durak'ı telefona yükle</b>Ana ekrandan uygulama gibi aç</div><button class="go">Yükle</button><button class="x" aria-label="Kapat">×</button>`;
+    el.hidden=false;
+    el.querySelector(".go").onclick=async()=>{ ev.prompt(); try{ await ev.userChoice; }catch(_){} el.hidden=true; };
+    el.querySelector(".x").onclick=close;
+  });
+  el.addEventListener("click",e=>{ if(e.target.classList.contains("x")) close(); });
+  window.addEventListener("appinstalled",()=>{ el.hidden=true; });
+})();
 // ================= GÜNDÜZ / GECE MODU =================
 const SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
 const MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
@@ -315,8 +352,9 @@ let dayKey="";
 function depsToday(x){
   const d=new Date(), k=d.toDateString();
   if(x._k===k) return x._t;
-  const b=1<<((d.getDay()+6)%7), yb=1<<((d.getDay()+5)%7), a=new Set();
-  x.d.forEach(([m,v])=>{ if(m&b) v.forEach(t=>a.add(t)); if(m&yb) v.forEach(t=>{if(t>=1440)a.add(t-1440)}); });
+  const b=1<<((d.getDay()+6)%7), yb=1<<((d.getDay()+5)%7), tb=1<<(d.getDay()%7), a=new Set();
+  // dün gece yarısını geçenler + bugün + yarın sabah (gece arayınca ilk sabah seferi bulunsun)
+  x.d.forEach(([m,v])=>{ if(m&b) v.forEach(t=>a.add(t)); if(m&yb) v.forEach(t=>{if(t>=1440)a.add(t-1440)}); if(m&tb) v.forEach(t=>{if(t<720)a.add(t+1440)}); });
   x._t=[...a].sort((p,q)=>p-q); x._k=k; return x._t;
 }
 // pos durağından 'from' dakikasından sonra geçen ilk n araç
@@ -648,8 +686,13 @@ function rank(all,now,limit){
   const byKey={};
   // Aynı hat dizisi: en kısa süreni, eşitse en erken çıkanı tut
   all.forEach(o=>{ o.mt=metrics(o); const k=o.walk?"walk":o.legs.map(l=>l.li).join(">"); const q=byKey[k];
-    if(!q||o.mt.dur<q.mt.dur-1||(Math.abs(o.mt.dur-q.mt.dur)<=1&&o.mt.leave<q.mt.leave)) byKey[k]=o; });
-  const cand=Object.values(byKey).filter(o=>o.mt.leave>=now-1&&o.mt.leave-now<=480&&o.mt.walk<6000)
+    if(!q||o.mt.dur<q.mt.dur-1||(Math.abs(o.mt.dur-q.mt.dur)<=1&&o.mt.leave<q.mt.leave)) byKey[k]=o;
+    // aynı hat dizisinin en erken varanı da kalsın ("En erken varış" kaybolmasın)
+    if(o.mt.leave>=now-1){ const qa=byKey["@"+k]; if(!qa||o.arr<qa.arr-0.5||(Math.abs(o.arr-qa.arr)<=0.5&&o.mt.dur<qa.mt.dur)) byKey["@"+k]=o; } });
+  for(const k in byKey) if(k[0]==="@"&&byKey[k.slice(1)]===byKey[k]) delete byKey[k];
+  // Aynı hattan inip yine aynı hatta binmek anlamsız ("araçta kal"): ele
+  const sameHop=o=>!o.walk&&o.legs.some((l,i)=>i>0&&LINES[l.li].b===LINES[o.legs[i-1].li].b&&LINES[l.li].b!=="MB"&&LINES[l.li].b!=="DM");
+  const cand=Object.values(byKey).filter(o=>!sameHop(o)&&o.mt.leave>=now-1&&o.mt.leave-now<=480&&o.mt.walk<6000)
     .sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
   const kept=[], other=[];
   for(const o of cand){
@@ -743,7 +786,7 @@ function planStages(A,B,Aids,Bids){
       if(bestNow>now+60) all.push(...raptor(get("A","gece"),get("B","gece"),now,null,{hor:300,full:true})); },
     // Gece ya da şu an makul sefer yoksa: sonraki çıkışlar ve sabah ilk seferleri (05:00–06:30), az/orta yürüme modlarıyla
     ()=>{ const hh=now%1440, soon=all.some(o=>!o.walk&&o.legs[0].board-now<=60), starts=[];
-      if(hh<300||!soon){ starts.push(now+30,now+60,now+120); if(hh<300) [300,330,360,390].forEach(t=>starts.push(now-hh+t)); }
+      if(hh<300||!soon){ starts.push(now+30,now+60,now+120); if(hh<300) [300,330,360,390].forEach(t=>starts.push(now-hh+t)); else if(hh>=1200) [300,330,360,390].forEach(t=>starts.push(now-hh+1440+t)); }
       for(const t0 of starts) for(const [ma,mb] of [["orta","orta"],["az","orta"],["orta","az"]]){
         const O=get("A",ma), Dn=get("B",mb); if(!O.length||!Dn.length) continue;
         let cur=raptor(O,Dn,t0,null,{hor:120}).filter(o=>o.legs[0].board>=t0); all.push(...cur);
