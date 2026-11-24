@@ -142,6 +142,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .fields{flex:1;min-width:0}
 .field{display:flex;align-items:center;gap:12px}
 .field+.field{border-top:1px solid var(--line)}
+.clr{flex:none;width:34px;height:34px;border-radius:50%;border:0;background:color-mix(in srgb,var(--ink) 9%,transparent);color:var(--muted);font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center}
 .field input{flex:1;min-width:0;border:none;background:none;font:inherit;font-size:16px;padding:12px 2px;color:var(--ink);outline:none}
 .dotA{width:11px;height:11px;border-radius:50%;background:#0b8a5c;flex:none}
 .dotB{width:11px;height:11px;border-radius:3px;background:var(--dest);flex:none}
@@ -226,8 +227,8 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
     <div id="rsearch">
       <div class="od">
         <div class="fields">
-          <label class="field"><span class="dotA"></span><input id="fromQ" placeholder="Nereden?" autocomplete="off"></label>
-          <label class="field"><span class="dotB"></span><input id="toQ" placeholder="Nereye? Durak, adres ya da yer" autocomplete="off"></label>
+          <label class="field"><span class="dotA"></span><input id="fromQ" placeholder="Nereden?" autocomplete="off"><button class="clr" data-clr="from" aria-label="Başlangıcı temizle" hidden>×</button></label>
+          <label class="field"><span class="dotB"></span><input id="toQ" placeholder="Nereye? Durak, adres ya da yer" autocomplete="off"><button class="clr" data-clr="to" aria-label="Varışı temizle" hidden>×</button></label>
         </div>
         <button class="swapb" id="swap" aria-label="Yer değiştir">⇅</button>
         <div class="sugg" id="sugg" hidden></div>
@@ -255,6 +256,27 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 // ================= UYGULAMA OLARAK YÜKLEME (PWA) =================
 if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
 
+
+// ================= SIFIRLAMA: × düğmeleri ve telefonun "geri" tuşu =================
+function clrBtns(){ document.querySelectorAll("[data-clr]").forEach(b=>{ const inp=b.dataset.clr==="from"?fromQ:toQ; b.hidden=!inp.value; }); }
+function clearEnd(w){
+  if(w==="from"||w==="both"){ M.A=null; M.Aname=""; M.Aids=null; fromQ.value=""; }
+  if(w==="to"||w==="both"){ M.B=null; M.Bname=""; M.Bids=null; toQ.value=""; }
+  M.runId=(M.runId||0)+1; M.plans=null; M.direct=null; M.deep=null;
+  if(M.sel!==null||!document.getElementById("detail").hidden) showList();
+  routeLayer.clearLayers(); if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
+  drawMarkers(); clrBtns(); renderPlans(); sugg.hidden=true;
+  msg(!M.A?"Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta.":"Nereye gideceğini yaz ya da haritada bir yere dokun.");
+}
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-clr]"); if(!b) return; e.preventDefault(); e.stopPropagation();
+  clearEnd(b.dataset.clr); (b.dataset.clr==="from"?fromQ:toQ).focus(); },true);
+document.addEventListener("input",e=>{ if(e.target===fromQ||e.target===toQ) clrBtns(); });
+// Geri: detaydan seçeneklere, seçeneklerden ana ekrana (varış temizlenir)
+window.addEventListener("popstate",()=>{
+  if(state.tab!=="rota"||state.line||state.stop) return;
+  if(!document.getElementById("detail").hidden){ showList(); try{map.fitBounds(L.latLngBounds([M.A,M.B]).pad(.25));}catch(e){} return; }
+  if(M.plans||M.B) clearEnd("to");
+});
 // ================= GÜNDÜZ / GECE MODU =================
 const SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
 const MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
@@ -579,7 +601,7 @@ function drawMarkers(a,b){
 // Nereden / Nereye ayarla
 function setEnd(which,ll,name,ids){
   if(which==="from"){ M.A=ll; M.Aname=name; M.Aids=ids||null; } else { M.B=ll; M.Bname=name; M.Bids=ids||null; }
-  fromQ.value=M.Aname; toQ.value=M.Bname;
+  fromQ.value=M.Aname; toQ.value=M.Bname; clrBtns();
   map.closePopup(); sugg.hidden=true; drawMarkers();
   if(M.A&&M.B){ lineLayer.remove(); computePlans(); }
   else { M.plans=null; renderPlans(); if(ll) map.setView(ll,Math.max(map.getZoom(),14));
@@ -880,6 +902,7 @@ async function deepPlan(){
 }
 function computePlans(){
   saveRecent();
+  if(!(history.state&&history.state.d)) try{ history.pushState({d:"plans"},""); }catch(e){}
   M.runId=(M.runId||0)+1; M.deep=null; M.deepMsg="";
   document.getElementById("plans").innerHTML=`<div class="more">⏳ Rotalar hesaplanıyor…</div>`;
   const run=M.runId;
@@ -997,6 +1020,7 @@ async function streetWalk(s,pl,k){
 }
 // Detay: harita + adım adım tarif
 function openPlan(k){
+  if(!(history.state&&history.state.d==="det")) try{ history.pushState({d:"det"},""); }catch(e){}
   M.sel=k; const o=M.plans[k], ss=steps(o), now=nowMin();
   document.getElementById("rsearch").hidden=true; document.getElementById("plans").hidden=true; document.getElementById("dtop").hidden=false; mv.classList.add("det"); map.invalidateSize();
   lineLayer.remove(); stopLayer.remove(); map.closePopup();
@@ -1306,7 +1330,7 @@ document.addEventListener("click",e=>{
   if(ds.direct!==undefined){ const o=M.direct[+ds.direct]; M.plans.push(o); return openPlan(M.plans.length-1); }
   if(el.hasAttribute("data-deep")){ M.deep="run"; renderPlans(); return setTimeout(deepPlan,30); }
   if(ds.open!==undefined) return openPlan(+ds.open);
-  if(el.hasAttribute("data-dback")){ showList(); try{map.fitBounds(L.latLngBounds([M.A,M.B]).pad(.25));}catch(e){} return; }
+  if(el.hasAttribute("data-dback")){ if(history.state&&history.state.d==="det") return history.back(); showList(); try{map.fitBounds(L.latLngBounds([M.A,M.B]).pad(.25));}catch(e){} return; }
   if(ds.popStop){ map.closePopup(); return openStop(ds.popStop); }
   if(ds.fh){ e.stopPropagation(); return toggleFav("h",ds.fh); }
   if(ds.fd!==undefined){ e.stopPropagation(); return toggleFav("d",ds.fd); }
