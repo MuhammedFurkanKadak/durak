@@ -64,6 +64,8 @@ header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:
 .favlines{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .favlines .fl{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .favlines .fl span{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mapview.det #homeback,#mapview.nav #homeback{display:none}
+#homeback{margin:0 0 6px}
 .themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
 .logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -225,6 +227,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
   </header>
   <main id="app"><div class="loading">Hatlar yükleniyor…</div></main>
   <section id="mapview" hidden>
+    <button class="back" id="homeback" hidden>‹ Geri</button>
     <div id="rsearch">
       <div class="od">
         <div class="fields">
@@ -266,7 +269,7 @@ function clearEnd(w){
   M.runId=(M.runId||0)+1; M.plans=null; M.direct=null; M.deep=null;
   if(M.sel!==null||!document.getElementById("detail").hidden) showList();
   routeLayer.clearLayers(); if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
-  drawMarkers(); clrBtns(); renderPlans(); sugg.hidden=true;
+  drawMarkers(); clrBtns(); homeBackBtn(); renderPlans(); sugg.hidden=true;
   msg(!M.A?"Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta.":"Nereye gideceğini yaz ya da haritada bir yere dokun.");
 }
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-clr]"); if(!b) return; e.preventDefault(); e.stopPropagation();
@@ -278,6 +281,11 @@ window.addEventListener("popstate",()=>{
   if(!document.getElementById("detail").hidden){ showList(); try{map.fitBounds(L.latLngBounds([M.A,M.B]).pad(.25));}catch(e){} return; }
   if(M.plans||M.B) clearEnd("to");
 });
+
+// Sonuç ekranından ana ekrana (Son yolculuklar / Favoriler) dönüş: varış temizlenir, başlangıç kalır
+function goHome(){ clearEnd("to"); if(history.state&&history.state.d) try{ history.replaceState(null,""); }catch(e){} }
+function homeBackBtn(){ const b=document.getElementById("homeback"); if(b) b.hidden=!(M.A&&M.B); }
+document.getElementById("homeback").onclick=()=>{ if(history.state&&history.state.d==="plans") history.back(); else goHome(); };
 // ================= GÜNDÜZ / GECE MODU =================
 const SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
 const MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
@@ -640,7 +648,7 @@ function drawMarkers(a,b){
 // Nereden / Nereye ayarla
 function setEnd(which,ll,name,ids){
   if(which==="from"){ M.A=ll; M.Aname=name; M.Aids=ids||null; } else { M.B=ll; M.Bname=name; M.Bids=ids||null; }
-  fromQ.value=M.Aname; toQ.value=M.Bname; clrBtns();
+  fromQ.value=M.Aname; toQ.value=M.Bname; clrBtns(); homeBackBtn();
   map.closePopup(); sugg.hidden=true; drawMarkers();
   if(M.A&&M.B){ lineLayer.remove(); computePlans(); }
   else { M.plans=null; renderPlans(); if(ll) map.setView(ll,Math.max(map.getZoom(),14));
@@ -1381,7 +1389,10 @@ document.addEventListener("click",e=>{
   if(ds.line) return openLine(ds.line,ds.d);
   if(ds.stop!==undefined) return openStop(ds.stop);
 });
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{hist=[];go({tab:b.dataset.tab,line:null,stop:null,q:""});});
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  // Zaten "Nasıl Giderim"deyken tekrar basınca: rota sonuçlarından ana ekrana dön
+  if(b.dataset.tab==="rota"&&state.tab==="rota"&&!state.line&&!state.stop&&(M.plans||M.B||NAV)){ if(NAV) stopNav(); goHome(); window.scrollTo(0,0); return; }
+  hist=[];go({tab:b.dataset.tab,line:null,stop:null,q:""});});
 setInterval(()=>{ if(!app.hidden&&(!document.activeElement||document.activeElement.tagName!=="INPUT")) render(); },30000);
 
 loadData().then(render).catch(e=>{app.innerHTML=`<div class="empty">Veri yüklenemedi: ${esc(e.message)}</div>`;});
