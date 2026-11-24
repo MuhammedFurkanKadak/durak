@@ -14,7 +14,8 @@
 <meta name="apple-mobile-web-app-title" content="Durak">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-<script>try{document.documentElement.dataset.theme=localStorage.getItem("durak-tema")==="dark"?"dark":"light"}catch(e){}</script>
+<script>try{if(navigator.standalone===true||matchMedia("(display-mode: standalone)").matches)document.documentElement.style.setProperty("--satmin",/iphone|ipad|ipod/i.test(navigator.userAgent)?"50px":"0px")}catch(e){}
+try{document.documentElement.dataset.theme=localStorage.getItem("durak-tema")==="dark"?"dark":"light"}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -36,7 +37,7 @@
 :root[data-theme="dark"] .leaflet-popup-content-wrapper,:root[data-theme="dark"] .leaflet-popup-tip{background:var(--card);color:var(--ink)}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
-body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(76px + env(safe-area-inset-bottom)) env(safe-area-inset-left);min-height:100vh}
+body{padding:max(env(safe-area-inset-top),var(--satmin,0px)) env(safe-area-inset-right) calc(76px + env(safe-area-inset-bottom)) env(safe-area-inset-left);min-height:100vh}
 .wrap{max-width:640px;margin:0 auto;padding:12px 16px}
 header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:16px 16px 18px;background:var(--hdrbg);color:var(--hdrink);box-shadow:0 0 0 100vmax var(--hdrbg);clip-path:inset(-100vmax -100vmax 0 -100vmax)}
 .inst{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13.5px}
@@ -520,6 +521,44 @@ document.addEventListener("click",e=>{
     const go=()=>{ if(!M.A&&myLoc){ M.A=myLoc; M.Aname=ME; M.Aids=null; } setEnd("to",STOPS[BYNAME[n][0]].p,n,group(n)); };
     if(!M.A&&!myLoc) return askLocation(go); return go(); }
 },true);
+
+// ================= SEÇİLEN NOKTANIN ADI =================
+// Haritadan seçilen yere hemen en yakın durağa göre bir ad ver, sonra adres/mekân adını (OpenStreetMap) getir.
+const GENERIC="Haritada seçilen nokta";
+function quickName(ll){ const n=near(ll,500)[0]; return n?`${STOPS[n.id].n} yakını`:"Seçilen nokta"; }
+const revCache={};
+async function revName(ll){
+  const k=ll.map(x=>(+x).toFixed(4)).join(",");
+  if(revCache[k]) return revCache[k];
+  try{
+    const r=await fetch(`https://photon.komoot.io/reverse?lat=${ll[0]}&lon=${ll[1]}&limit=5&radius=0.15&lang=default`).then(r=>r.json());
+    let best=null,bd=1e9;
+    for(const f of (r.features||[])){ const c=f.geometry&&f.geometry.coordinates; if(!c) continue; const d=hav(ll,[c[1],c[0]]); if(d<bd){bd=d;best=f.properties;} }
+    if(best&&bd<200){
+      const p=best, area=p.district||p.locality||p.suburb||p.county||"";
+      let n=p.name&&p.name!==p.street?p.name:(p.street?p.street+(p.housenumber?" No:"+p.housenumber:""):"");
+      if(n){ if(area&&!n.includes(area)) n+=", "+area; return revCache[k]=n; }
+    }
+  }catch(e){}
+  return revCache[k]=quickName(ll);
+}
+const sameLL=(a,b)=>a&&b&&Math.abs(a[0]-b[0])<1e-5&&Math.abs(a[1]-b[1])<1e-5;
+async function nameLater(w,ll){
+  const n=await revName(ll);
+  if(w==="from"&&sameLL(M.A,ll)){ M.Aname=n; fromQ.value=n; }
+  if(w==="to"&&sameLL(M.B,ll)){ M.Bname=n; toQ.value=n; }
+  fixSavedNames(ll,n);
+}
+// Kayıtlı yolculuklardaki eski "Haritada seçilen nokta" adlarını da düzelt
+function fixSavedNames(ll,n){
+  let ch=false;
+  [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&e.n!==ME&&!e.st&&sameLL(e.ll,ll)&&e.n!==n){ e.n=n; ch=true; } }));
+  if(ch){ try{ localStorage.setItem("durak-son",JSON.stringify(recent)); }catch(e){} saveFav(); if(!M.plans&&!(M.A&&M.B)) renderPlans(); }
+}
+function fixOldNames(){
+  const todo=[]; [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&(e.n===GENERIC||e.n==="Seçilen nokta")&&e.ll) todo.push(e.ll); }));
+  todo.slice(0,8).forEach((ll,i)=>setTimeout(async()=>fixSavedNames(ll,await revName(ll)),300*i));
+}
 // ================= HARİTA =================
 let map, lineLayer, stopLayer, vehLayer, routeLayer, mkA, mkB, myLoc=null, locAsked=false;
 const M={A:null,B:null,Aname:"",Bname:"",Aids:null,Bids:null,plans:null,sel:null,field:"to"};
@@ -551,7 +590,7 @@ function initMap(){
     L.popup().setLatLng(ll).setContent(`<div class="pop"><b>Seçilen nokta</b><button data-pick="to" data-ll="${ll}">Buraya git</button><button class="g" data-pick="from" data-ll="${ll}">Buradan başla</button></div>`).openOn(map);
   });
   drawVehicles(); setInterval(drawVehicles,3000);
-  renderPlans();
+  renderPlans(); setTimeout(fixOldNames,1500);
   askLocation();
 }
 // Tarifeye göre tahmini araç konumları (görünür alandakiler)
@@ -1324,7 +1363,8 @@ function openStop(n){ hist.push({line:state.line,stop:state.stop,dir:state.dir,t
 document.addEventListener("click",e=>{
   const el=e.target.closest("[data-alt],[data-direct],[data-deep],[data-pick],[data-open],[data-dback],[data-fh],[data-fd],[data-f],[data-dir],[data-back],[data-line],[data-stop],[data-goto],[data-pop-stop]"); if(!el) return;
   const ds=el.dataset;
-  if(ds.pick){ const ll=ds.sid?STOPS[ds.sid].p:ds.ll.split(",").map(Number); return setEnd(ds.pick,ll,ds.sid?STOPS[ds.sid].n:"Haritada seçilen nokta"); }
+  if(ds.pick){ const ll=ds.sid?STOPS[ds.sid].p:ds.ll.split(",").map(Number); if(ds.sid) return setEnd(ds.pick,ll,STOPS[ds.sid].n);
+    setEnd(ds.pick,ll,quickName(ll)); return nameLater(ds.pick,ll); }
   if(ds.alt){ const [k,j]=ds.alt.split(":").map(Number); if(j===0) return; const g=M.plans[k], all=[g,...g.alts], c=all[j];
     c.alts=all.filter(x=>x!==c); c.tags=g.tags; g.alts=[]; M.plans[k]=c; return openPlan(k); }
   if(ds.direct!==undefined){ const o=M.direct[+ds.direct]; M.plans.push(o); return openPlan(M.plans.length-1); }
