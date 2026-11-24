@@ -145,6 +145,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .step.s-walk::before{content:"";position:absolute;left:25px;top:40px;bottom:-4px;border-left:3px dotted var(--muted)}
 #mapview.det #map{height:38vh;max-height:420px}
 #dtop{margin-bottom:6px}
+.cb.plus{background:#e7e3da!important;color:#4a4f57!important}
 .navgo{display:block;width:100%;border:0;border-radius:14px;padding:13px;margin-bottom:10px;background:#1f6feb;color:#fff;font:700 16px Inter,system-ui,sans-serif;cursor:pointer}
 #mapview.nav #map{height:46vh;max-height:520px}
 #mapview.nav #detail,#mapview.nav #dtop{display:none}
@@ -418,7 +419,8 @@ function drawVehicles(){
   if(!map||document.getElementById("mapview").hidden) return;
   vehLayer.clearLayers();
   const now=nowMin(), b=map.getBounds().pad(.1), z=map.getZoom(), sel=M.sel!==null&&M.plans?M.plans[M.sel]:null;
-  // Detay ekranında: sadece bineceğin araçlar (her ayak için o sefer)
+  // Genel haritada araç gösterme (kalabalık); detayda sadece bineceğin araçlar
+  if(!sel) return;
   if(sel){
     (sel.legs||[]).forEach(g=>{
       const Ln=LINES[g.li], x=Ln.dir[g.di], start=g.board-x.o[g.from], e=now-start;
@@ -461,7 +463,7 @@ function setEnd(which,ll,name,ids){
   if(which==="from"){ M.A=ll; M.Aname=name; M.Aids=ids||null; } else { M.B=ll; M.Bname=name; M.Bids=ids||null; }
   fromQ.value=M.Aname; toQ.value=M.Bname;
   map.closePopup(); sugg.hidden=true; drawMarkers();
-  if(M.A&&M.B){ computePlans(); }
+  if(M.A&&M.B){ lineLayer.remove(); computePlans(); }
   else { M.plans=null; renderPlans(); if(ll) map.setView(ll,Math.max(map.getZoom(),14));
     msg(!M.A?"Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta.":"Nereye gideceğini yaz ya da haritada bir yere dokun."); }
 }
@@ -804,22 +806,23 @@ function steps(o){
   out.push({k:"walk",from:p(o.w2.sid),to:o.w2.m?M.B:p(o.w2.sid),m:o.w2.m,dk:o.w2.w,t:last.end,txt:"Varış noktasına yürü"});
   return out;
 }
-const chain=(o,single)=>{ let ri=0; const all=[o,...(single?[]:(o.alts||[]))];
+const chain=(o,single,compact)=>{ let ri=0; const all=[o,...(single?[]:(o.alts||[]))];
   return steps(o).map(s=>{ if(s.k==="walk") return s.m>40?`<span class="w">🚶${s.dk}</span>`:"";
     const i=ri++, seen=new Set(), Ls=[];
     all.forEach(p=>{ const L=LINES[p.legs[i].li]; const k=L.b+"|"+L.t; if(!seen.has(k)){ seen.add(k); Ls.push(L);} });
-    return Ls.map(L=>`<span class="cb" style="background:${lc(L)}">${esc(L.b)}</span>`).join(`<span class="alt">/</span>`); }).filter(Boolean).join(`<span class="sep">›</span>`); };
+    const sh=compact?Ls.slice(0,1):Ls, more=Ls.length-sh.length;
+    return sh.map(L=>`<span class="cb" style="background:${lc(L)}">${esc(L.b)}</span>`).join(`<span class="alt">/</span>`)+(more?`<span class="cb plus">+${more}</span>`:""); }).filter(Boolean).join(`<span class="sep">›</span>`); };
 
 // Kısa, tıklanabilir seçenek kartları
 function planCard(o,k,now){
   const mt=o.mt||metrics(o), first=o.legs?o.legs[0]:null;
   const leaveTxt=mt.leave-now<=1?"Hemen çık":`Çıkış ${fmt(mt.leave)} · ${dk(mt.leave-now)} sonra`;
   let sub=o.walk?`${o.m} m yürüyüş`:`${leaveTxt} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)}`;
-  if(o.alts&&o.alts.length){ const ms=[o,...o.alts].sort((a,b)=>a.legs[0].board-b.legs[0].board).slice(0,4);
-    sub=`${o.alts.length+1} seçenek · ${ms.map(p=>`${esc(LINES[p.legs[0].li].b)} ${fmt(p.legs[0].board)}`).join(" · ")}`; }
+  if(o.alts&&o.alts.length){ const lv=[...new Set(o.alts.map(p=>(p.mt||metrics(p)).leave).filter(t=>t>mt.leave+0.5).sort((x,y)=>x-y).map(fmt))].slice(0,2);
+    if(lv.length) sub+=` · sonra ${lv.join(", ")}`; }
   const tg=(o.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
   const meta=o.walk?"":` · 🚶 ${mt.walk>=1000?(mt.walk/1000).toFixed(1)+" km":mt.walk+" m"}`;
-  return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o)}</div><div class="sub">${sub}${meta}</div></div>
+  return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o,false,true)}</div><div class="sub">${sub}${meta}</div></div>
     <div class="dur">${dkBig(mt.dur)}<span>${fmt(mt.leave)}–${fmt(o.arr)}</span></div><span class="chev">›</span></div>`;
 }
 // Kısa, tıklanabilir seçenek kartları
@@ -850,7 +853,7 @@ function showList(){
   M.sel=null; routeLayer.clearLayers();
   document.getElementById("rsearch").hidden=false; document.getElementById("plans").hidden=false;
   document.getElementById("detail").hidden=true; document.getElementById("dtop").hidden=true; mv.classList.remove("det"); setTimeout(()=>map.invalidateSize(),0);
-  if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
+  if(M.A&&M.B) lineLayer.remove(); else if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
   drawMarkers(); drawVehicles();
 }
 // Yürüme yolunu sokaklar üzerinden al (OpenStreetMap yürüme rotası)
