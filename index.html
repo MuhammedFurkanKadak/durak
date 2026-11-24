@@ -1074,12 +1074,23 @@ function navEnter(){
   else if(P.k==="done"){ say("Vardın"); buzz(); }
 }
 function navNext(d){ const n=NAV.i+d; if(n<0||n>=NAV.ph.length) return; NAV.i=n; navEnter(); navTick(); }
-const gpsOk=()=>NAV.pos&&Date.now()-NAV.fix<45000&&(NAV.acc||0)<150;
+// Başlangıç "Konumum" değilse (haritadan seçilen nokta) ve sen rotanın uzağındaysan GPS kullanılmaz:
+// tarif seçtiğin başlangıçtan yürür, adımları elle ilerletirsin. Rotaya yaklaşınca (500 m) GPS devreye girer.
+function navOnRoute(){
+  if(NAV.onRoute) return true;
+  if(!NAV.pos) return false;
+  if(M.Aname==="📍 Konumum") return NAV.onRoute=true;
+  const pts=[M.A,M.B]; NAV.ph.forEach(q=>{ if(q.k==="walk"){ if(q.from) pts.push(q.from); pts.push(q.to); } else if(q.pts) q.pts.forEach(z=>pts.push(z.p)); });
+  if(pts.some(q=>q&&hav(NAV.pos,q)<500)){ NAV.onRoute=true; say("Konumun bulundu, takip başladı"); }
+  return NAV.onRoute;
+}
+const gpsOk=()=>NAV.pos&&Date.now()-NAV.fix<45000&&(NAV.acc||0)<150&&navOnRoute();
 function navTick(){
   if(!NAV) return;
   const P=NAV.ph[NAV.i], now=nowMin(), pos=NAV.pos;
   // konum işareti (GPS yoksa adımın yerine göre tahmini konum, içi boş halka)
-  if(pos){ if(!NAV.mk){ NAV.ac=L.circle(pos,{radius:NAV.acc||30,color:"#1f6feb",weight:1,fillOpacity:.12,interactive:false}).addTo(map);
+  if(pos&&!navOnRoute()&&NAV.mk){ NAV.mk.remove(); NAV.ac.remove(); NAV.mk=null; }
+  if(pos&&navOnRoute()){ if(!NAV.mk){ NAV.ac=L.circle(pos,{radius:NAV.acc||30,color:"#1f6feb",weight:1,fillOpacity:.12,interactive:false}).addTo(map);
       NAV.mk=L.circleMarker(pos,{radius:8,color:"#fff",weight:3,fillColor:"#1f6feb",fillOpacity:1,interactive:false}).addTo(map); }
     else { NAV.mk.setLatLng(pos); NAV.ac.setLatLng(pos).setRadius(NAV.acc||30); } }
   // kendiliğinden ilerleme
@@ -1123,7 +1134,8 @@ function navCamera(){
   else map.setView(M.B,17,{animate:true});
 }
 function navRender(){
-  const P=NAV.ph[NAV.i], now=nowMin(), pos=NAV.pos, el=navEl();
+  const P=NAV.ph[NAV.i], now=nowMin(), live=gpsOk(), pos=live?NAV.pos:null, el=navEl();
+  const far=NAV.pos&&!NAV.onRoute;
   const nextRide=NAV.ph.slice(NAV.i+1).find(q=>q.k==="wait");
   let ic="", t="", sub="", warn="", alert="", btn="";
   if(P.k==="walk"){
@@ -1132,7 +1144,9 @@ function navRender(){
       if(nextRide&&NAV.ph[NAV.i+1]===nextRide){ const s=nextRide.s, ar=now+walkMin(d), nx=nextAt(s.x,s.g.from,ar,2);
         warn=nx.length?`${esc(nm(s.Ln))} sonraki kalkış ${nx.map(fmt).join(", ")}${nx[0]-ar<=1?" · acele et":""}`:"";
         if(NAV.i===0&&ar>s.t) warn=`<span class="late">Planlanan araca (${fmt(s.t)}) yetişemeyebilirsin.</span> `+warn; } }
+    else if(P.from){ const d=hav(P.from,P.to); sub=`${Math.round(d)} m · ~${dk(walkMin(d))}${far?" · konumun rotadan uzakta":NAV.gpsErr?" · "+NAV.gpsErr:""}`; }
     else sub=NAV.gpsErr||"Konum bekleniyor…";
+    if(far) warn=(warn?warn+"<br>":"")+"Seçtiğin başlangıçtan tarif ediliyor. Adımları <b>Vardım / Bindim / İndim</b> ile ilerlet; rotaya yaklaşınca konumun kendiliğinden takip edilir.";
     btn=`<button data-navnx="1">Vardım ›</button>`;
   } else if(P.k==="wait"){
     const s=P.s, nx=nextAt(s.x,s.g.from,now-0.5,3);
@@ -1160,7 +1174,7 @@ function navRender(){
     <div class="nb">${NAV.i>0?`<button data-navnx="-1">‹ Geri</button>`:""}${btn}
       ${NAV.follow?"":`<button data-navctr>◎ Ortala</button>`}
       <button data-navsnd>${NAV.sound?"🔊":"🔇"}</button>
-      ${pos&&P.k!=="done"?`<button data-navre>↻ Buradan yeniden</button>`:""}
+      ${live&&P.k!=="done"?`<button data-navre>↻ Buradan yeniden</button>`:""}
       <button data-navstop>✕ Bitir</button></div>`;
 }
 document.addEventListener("click",e=>{
