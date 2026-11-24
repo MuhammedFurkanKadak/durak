@@ -55,6 +55,14 @@ header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:
 .gs{font-size:12.5px!important}
 .garrow{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:40px;font-weight:800;color:#fff;animation:gb 1s ease-in-out infinite}
 @keyframes gb{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
+.trip .hico{width:40px;height:40px;border-radius:12px;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand);display:grid;place-items:center;flex:none}
+.trip .hico.f{background:color-mix(in srgb,#f2b705 22%,transparent);color:#b8860b}
+.trip .t b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trip .t span{font-size:12.5px;color:var(--muted)}
+.trip .t{flex:1;min-width:0}
+.favlines{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.favlines .fl{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.favlines .fl span{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
 .logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -213,7 +221,6 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
     <div><h1>Durak</h1><small>İstanbul toplu taşıma · reklamsız</small></div>
     <button class="themeb" id="themeb" aria-label="Gece moduna geç"></button>
   </header>
-  <div class="inst" id="inst" hidden></div>
   <main id="app"><div class="loading">Hatlar yükleniyor…</div></main>
   <section id="mapview" hidden>
     <div id="rsearch">
@@ -247,55 +254,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 
 // ================= UYGULAMA OLARAK YÜKLEME (PWA) =================
 if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
-(function(){
-  const el=document.getElementById("inst"); if(!el) return;
-  const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
-  let dismissed=false; try{ dismissed=localStorage.getItem("durak-inst2")==="1"; }catch(e){}
-  if(standalone||dismissed) return;
-  const close=()=>{ el.hidden=true; try{ localStorage.setItem("durak-inst2","1"); }catch(e){} };
-  const ua=navigator.userAgent, ios=/iphone|ipad|ipod/i.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
-  const inApp=/Instagram|FBAN|FBAV|Twitter|Line\/|WhatsApp|GSA\//i.test(ua), iosChrome=/CriOS|FxiOS|EdgiOS/.test(ua);
-  const ic='<img src="/icons/icon-192.png" alt="" width="40" height="40" style="border-radius:10px;flex:none">';
-  let promptEv=null;
-  const show=()=>{ el.innerHTML=`${ic}<div><b>Durak'ı telefona yükle</b>Ana ekrandan uygulama gibi aç</div><button class="go" id="instgo">Yükle</button><button class="x" aria-label="Kapat">×</button>`; el.hidden=false; };
-  show();
-  window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); promptEv=e; });
-  el.addEventListener("click",async e=>{
-    if(e.target.classList.contains("x")) return close();
-    if(e.target.id!=="instgo") return;
-    if(promptEv){ promptEv.prompt(); try{ await promptEv.userChoice; }catch(_){} promptEv=null; return; }
-    openGuide();
-  });
-  window.addEventListener("appinstalled",()=>{ el.hidden=true; });
-  // Adım adım kurulum rehberi (iPhone'da sitenin kendisi kurulum başlatamaz; Safari'nin menüsünden yapılır)
-  const SHARE='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
-  const DOTS='<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
-  const PLUS='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
-  const KEBAB='<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
-  function openGuide(){
-    let steps, top="", arrow="";
-    if(inApp){
-      top=`<p>Bu sayfa bir uygulamanın (Instagram, WhatsApp…) içinde açılmış. Kurmak için önce ${ios?"Safari":"Chrome"}'da açman gerekiyor.</p>`;
-      steps=[[KEBAB,`Sağ üstteki <b>⋯</b> menüsüne dokun`],[SHARE,`<b>${ios?"Safari'de Aç":"Tarayıcıda aç"}</b>'ı seç`],[PLUS,"Açılan sayfada yine <b>Yükle</b>'ye bas"]];
-    } else if(ios){
-      steps=iosChrome
-        ?[[SHARE,"Adres çubuğunun sağındaki <b>Paylaş</b> simgesine dokun"],[PLUS,"Listeden <b>Ana Ekrana Ekle</b>'yi seç"],[`<b style="font-size:15px">Ekle</b>`,"Sağ üstte <b>Ekle</b>'ye dokun"]]
-        :[[`<span style="display:flex;gap:6px">${SHARE}${DOTS}</span>`,"Ekranın en altındaki <b>Paylaş</b> simgesine dokun. Görmüyorsan önce <b>⋯</b>'ye, sonra <b>Paylaş</b>'a dokun"],[PLUS,"Listeyi biraz kaydır, <b>Ana Ekrana Ekle</b>'yi seç"],[`<b style="font-size:15px">Ekle</b>`,"Sağ üstte <b>Ekle</b>'ye dokun. Durak ikonu ana ekranına gelir"]];
-      if(!iosChrome) arrow='<div class="garrow" aria-hidden="true">↓</div>';
-    } else {
-      steps=[[KEBAB,"Chrome'un sağ üstündeki <b>⋮</b> menüsüne dokun"],[PLUS,"<b>Uygulamayı yükle</b> ya da <b>Ana ekrana ekle</b>'yi seç"],[`<b style="font-size:15px">Yükle</b>`,"Çıkan pencerede <b>Yükle</b>'ye dokun"]];
-    }
-    const g=document.createElement("div"); g.className="guide";
-    g.innerHTML=`<div class="gbox" role="dialog" aria-label="Durak'ı telefona yükle"><button class="gx" aria-label="Kapat">×</button>
-      <div style="display:flex;gap:10px;align-items:center">${ic}<b style="font-size:18px">Durak'ı ana ekrana ekle</b></div>${top}
-      <ol>${steps.map(([i,t],n)=>`<li><span class="gn">${n+1}</span><span class="gi">${i}</span><span>${t}</span></li>`).join("")}</ol>
-      ${inApp?`<button class="gcopy">Linki kopyala</button>`:""}
-      <p class="gs">Kurduktan sonra Durak'ı ana ekrandaki ikondan aç: tam ekran açılır, internetsiz de çalışır.</p></div>${arrow}`;
-    document.body.appendChild(g);
-    g.addEventListener("click",e=>{ if(e.target===g||e.target.classList.contains("gx")) g.remove();
-      if(e.target.classList.contains("gcopy")){ try{ navigator.clipboard.writeText(location.origin); e.target.textContent="Kopyalandı ✓"; }catch(_){} } });
-  }
-})();
+
 // ================= GÜNDÜZ / GECE MODU =================
 const SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
 const MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
@@ -407,7 +366,7 @@ function nextAt(x,pos,from,n=1){
 let fav={h:[],d:[]};
 try{ fav=JSON.parse(localStorage.getItem("durak-fav2"))||fav; }catch(e){}
 const isFav=(k,id)=>fav[k].includes(id);
-function toggleFav(k,id){ fav[k]=isFav(k,id)?fav[k].filter(x=>x!==id):[...fav[k],id]; try{localStorage.setItem("durak-fav2",JSON.stringify(fav));}catch(e){} render(); }
+function toggleFav(k,id){ fav[k]=isFav(k,id)?fav[k].filter(x=>x!==id):[...fav[k],id]; try{localStorage.setItem("durak-fav2",JSON.stringify(fav));}catch(e){} render(); if(state.tab==="rota") renderPlans(); }
 
 // ================= DURUM =================
 let state={tab:"rota",q:"",filtre:"hepsi",line:null,dir:0,stop:null};
@@ -488,6 +447,57 @@ function viewFav(){
     <button class="star on" data-fd="${esc(n)}">★</button></div>`).join("")||`<div class="empty">Durak sayfasında ☆'a dokunarak ekle.</div>`}</div>`;
 }
 
+// ================= SON YOLCULUKLAR & FAVORİLER (haritanın altı) =================
+let recent=[]; try{ recent=JSON.parse(localStorage.getItem("durak-son"))||[]; }catch(e){}
+if(!fav.r) fav.r=[];
+const ME="📍 Konumum";
+const endOf=w=>w==="from"?{ll:M.A,n:M.Aname,st:!!M.Aids}:{ll:M.B,n:M.Bname,st:!!M.Bids};
+const pk=e=>e.n===ME?ME:e.n+"@"+e.ll.map(x=>(+x).toFixed(4)).join(",");
+const tripKey=t=>pk(t.a)+">"+pk(t.b);
+function saveRecent(){
+  if(!M.A||!M.B) return;
+  const t={a:endOf("from"),b:endOf("to"),t:Date.now()}, k=tripKey(t);
+  recent=[t,...recent.filter(x=>tripKey(x)!==k)].slice(0,6);
+  try{ localStorage.setItem("durak-son",JSON.stringify(recent)); }catch(e){}
+}
+function saveFav(){ try{ localStorage.setItem("durak-fav2",JSON.stringify(fav)); }catch(e){} }
+function toggleFavTrip(t){ const k=tripKey(t); fav.r=fav.r.some(x=>tripKey(x)===k)?fav.r.filter(x=>tripKey(x)!==k):[...fav.r,{a:t.a,b:t.b}]; saveFav(); renderPlans(); }
+function runTrip(t){
+  const go=()=>{ const r=e=>e.n===ME?[myLoc,ME,null]:[e.ll,e.n,e.st&&BYNAME[e.n]?group(e.n):null];
+    const [a1,a2,a3]=r(t.a),[b1,b2,b3]=r(t.b); M.A=a1; M.Aname=a2; M.Aids=a3; setEnd("to",b1,b2,b3); };
+  if((t.a.n===ME||t.b.n===ME)&&!myLoc) return askLocation(go);
+  go();
+}
+const ago=ms=>{ const m=Math.round((Date.now()-ms)/60000); if(m<1) return "az önce"; if(m<60) return m+" dk önce"; const h=Math.round(m/60); if(h<24) return h+" sa önce"; const d=Math.round(h/24); return d===1?"dün":d+" gün önce"; };
+const nmE=e=>e.n===ME?"Konumum":e.n;
+const IC_CLOCK='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+const IC_STAR='<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>';
+const IC_PIN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+function tripRow(t,attr,i,isF){
+  return `<div class="item trip" ${attr}="${i}"><span class="hico${isF?" f":""}">${isF?IC_STAR:IC_CLOCK}</span><div class="t"><b>${esc(nmE(t.b))}</b><span>Nereden: ${esc(nmE(t.a))}${t.t?" · "+ago(t.t):""}</span></div>
+    <button class="star ${fav.r.some(x=>tripKey(x)===tripKey(t))?"on":""}" data-ftrip="${attr}:${i}" aria-label="Favorilere ekle">${fav.r.some(x=>tripKey(x)===tripKey(t))?"★":"☆"}</button></div>`;
+}
+function homeHTML(){
+  const hs=LINES.filter(L=>isFav("h",L.id));
+  let h=`<h3 class="sec" style="margin-top:6px">Son yolculuklar</h3><div class="list">${recent.map((t,i)=>tripRow(t,"data-trip",i,false)).join("")||`<div class="empty" style="padding:16px">Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.</div>`}</div>`;
+  h+=`<h3 class="sec">Favoriler</h3><div class="list">`;
+  const items=fav.r.map((t,i)=>tripRow(t,"data-favtrip",i,true))
+    .concat(fav.d.map(n=>`<div class="item trip" data-gostop="${esc(n)}"><span class="hico f">${IC_PIN}</span><div class="t"><b>${esc(n)}</b><span>Durak · buraya git</span></div><button class="star on" data-fd="${esc(n)}" aria-label="Favoriden çıkar">★</button></div>`));
+  h+=items.join("")||`<div class="empty" style="padding:16px">Son yolculuklardaki ☆ ile sık gittiğin yerleri buraya ekle.</div>`;
+  h+=`</div>`;
+  if(hs.length) h+=`<div class="favlines">${hs.map(L=>`<button class="fl" data-line="${L.id}">${badge(L)}<span>${esc(L.n)}</span></button>`).join("")}</div>`;
+  return h;
+}
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-fd]")) return;
+  const b=e.target.closest("[data-ftrip],[data-trip],[data-favtrip],[data-gostop]"); if(!b||!document.getElementById("plans").contains(b)) return;
+  if(b.dataset.ftrip){ e.stopPropagation(); const [a,i]=b.dataset.ftrip.split(":"); return toggleFavTrip(a==="data-trip"?recent[+i]:fav.r[+i]); }
+  if(b.dataset.trip!==undefined) return runTrip(recent[+b.dataset.trip]);
+  if(b.dataset.favtrip!==undefined) return runTrip(fav.r[+b.dataset.favtrip]);
+  if(b.dataset.gostop!==undefined){ const n=b.dataset.gostop; if(!BYNAME[n]) return;
+    const go=()=>{ if(!M.A&&myLoc){ M.A=myLoc; M.Aname=ME; M.Aids=null; } setEnd("to",STOPS[BYNAME[n][0]].p,n,group(n)); };
+    if(!M.A&&!myLoc) return askLocation(go); return go(); }
+},true);
 // ================= HARİTA =================
 let map, lineLayer, stopLayer, vehLayer, routeLayer, mkA, mkB, myLoc=null, locAsked=false;
 const M={A:null,B:null,Aname:"",Bname:"",Aids:null,Bids:null,plans:null,sel:null,field:"to"};
@@ -519,6 +529,7 @@ function initMap(){
     L.popup().setLatLng(ll).setContent(`<div class="pop"><b>Seçilen nokta</b><button data-pick="to" data-ll="${ll}">Buraya git</button><button class="g" data-pick="from" data-ll="${ll}">Buradan başla</button></div>`).openOn(map);
   });
   drawVehicles(); setInterval(drawVehicles,3000);
+  renderPlans();
   askLocation();
 }
 // Tarifeye göre tahmini araç konumları (görünür alandakiler)
@@ -868,6 +879,7 @@ async function deepPlan(){
   M.plans=[...r.top,...r.more]; M.topCount=r.top.length; M.deep="done"; M.deepMsg=""; renderPlans();
 }
 function computePlans(){
+  saveRecent();
   M.runId=(M.runId||0)+1; M.deep=null; M.deepMsg="";
   document.getElementById("plans").innerHTML=`<div class="more">⏳ Rotalar hesaplanıyor…</div>`;
   const run=M.runId;
@@ -941,7 +953,7 @@ function planCard(o,k,now){
 // Kısa, tıklanabilir seçenek kartları
 function renderPlans(){
   const el=document.getElementById("plans"), now=nowMin();
-  if(!M.plans){ el.innerHTML=""; return; }
+  if(!M.plans){ el.innerHTML=M.A&&M.B?"":homeHTML(); return; }
   const top=M.plans.slice(0,M.topCount), more=M.plans.slice(M.topCount);
   const dl=M.direct||[];
   let html=dl.length?`<h3 class="sec" style="margin-top:4px">Aktarmasız giden hatlar</h3><div class="dchips">${dl.map((o,i)=>{const g=o.legs[0],Ln=LINES[g.li];
