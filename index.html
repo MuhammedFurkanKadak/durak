@@ -5,26 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Durak – İstanbul Toplu Taşıma</title>
 <meta name="description" content="Reklamsız İstanbul toplu taşıma: metro, Marmaray, tramvay, vapur, minibüs ve dolmuş hatları, sefer saatleri ve nasıl giderim.">
-<meta name="theme-color" content="#f2b300">
+<meta name="theme-color" content="#1f4fd8">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("durak-tema")==="dark"?"dark":"light"}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{
-  --bg:#f6f5f1; --card:#ffffff; --ink:#15171a; --muted:#6b7078; --line:#e6e3dc;
-  --brand:#f2b300; --brand-ink:#1a1400; --radius:16px;
+  --bg:#eef2f8; --card:#ffffff; --ink:#0f1b33; --muted:#5a6578; --line:#dbe2ee;
+  --brand:#1f4fd8; --brand-ink:#ffffff; --radius:16px; --hdrbg:#1f4fd8; --hdrink:#ffffff; --dest:#f2b705;
 }
-@media (prefers-color-scheme: dark){
-  :root{ --bg:#0f1113; --card:#181b1f; --ink:#eef0f2; --muted:#9aa1a9; --line:#262a30; }
+/* Gece modu (sağ üstteki düğmeyle) */
+:root[data-theme="dark"]{
+  --bg:#0e131d; --card:#182131; --ink:#eef3fb; --muted:#9aa8bd; --line:#26324a;
+  --brand:#4cc2ff; --brand-ink:#06121c; --hdrbg:#0e131d; --hdrink:#eef3fb;
+  color-scheme:dark;
 }
+:root[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7)}
+:root[data-theme="dark"] .leaflet-container{background:#0e131d}
+:root[data-theme="dark"] .leaflet-bar a{background:var(--card);color:var(--ink);border-color:var(--line)}
+:root[data-theme="dark"] .leaflet-control-attribution{background:rgba(14,19,29,.75)!important;color:var(--muted)}
+:root[data-theme="dark"] .leaflet-popup-content-wrapper,:root[data-theme="dark"] .leaflet-popup-tip{background:var(--card);color:var(--ink)}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
 body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(76px + env(safe-area-inset-bottom)) env(safe-area-inset-left);min-height:100vh}
 .wrap{max-width:640px;margin:0 auto;padding:12px 16px}
-header{display:flex;align-items:center;gap:10px;padding:4px 0 12px}
-.logo{width:38px;height:38px;border-radius:11px;background:var(--brand);display:grid;place-items:center;flex:none}
+header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:16px 16px 18px;background:var(--hdrbg);color:var(--hdrink);box-shadow:0 0 0 100vmax var(--hdrbg);clip-path:inset(0 -100vmax)}
+.themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
+.logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
-header small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+header small{display:block;font-size:12px;opacity:.8;font-weight:500}
 .note{font-size:12px;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px}
 .search{position:relative;margin-bottom:12px}
 .search input{width:100%;font:inherit;font-size:16px;padding:14px 14px 14px 44px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);outline:none}
@@ -102,7 +112,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .field+.field{border-top:1px solid var(--line)}
 .field input{flex:1;min-width:0;border:none;background:none;font:inherit;font-size:16px;padding:12px 2px;color:var(--ink);outline:none}
 .dotA{width:11px;height:11px;border-radius:50%;background:#0b8a5c;flex:none}
-.dotB{width:11px;height:11px;border-radius:3px;background:var(--brand);flex:none}
+.dotB{width:11px;height:11px;border-radius:3px;background:var(--dest);flex:none}
 .swapb{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:18px;cursor:pointer;flex:none}
 .od .sugg{top:100%;max-height:60vh;overflow-y:auto}
 .sugg .sh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 14px 4px;background:var(--bg)}
@@ -147,8 +157,8 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 #dtop{margin-bottom:6px}
 .mri{height:1.15em;width:1.66em;vertical-align:-.22em;display:inline-block}
 .mrn{font-size:.75em;margin-left:2px;font-weight:800}
-.cb.plus{background:#e7e3da!important;color:#4a4f57!important}
-.navgo{display:block;width:100%;border:0;border-radius:14px;padding:13px;margin-bottom:10px;background:#1f6feb;color:#fff;font:700 16px Inter,system-ui,sans-serif;cursor:pointer}
+.cb.plus{background:color-mix(in srgb,var(--ink) 10%,transparent)!important;color:var(--muted)!important}
+.navgo{display:block;width:100%;border:0;border-radius:14px;padding:13px;margin-bottom:10px;background:var(--brand);color:var(--brand-ink);font:700 16px Inter,system-ui,sans-serif;cursor:pointer}
 #mapview.nav #map{height:46vh;max-height:520px}
 #mapview.nav #detail,#mapview.nav #dtop{display:none}
 #nav{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:8px;position:sticky;top:6px;z-index:500;box-shadow:0 4px 14px rgba(0,0,0,.12)}
@@ -167,7 +177,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 
 .leaflet-popup-content{font-family:Inter,system-ui,sans-serif;font-size:13px}
 .pop b{display:block;margin-bottom:6px}
-.pop button{font:inherit;font-size:12.5px;font-weight:700;border:none;border-radius:8px;padding:6px 10px;margin:2px 4px 0 0;cursor:pointer;background:#f2b300;color:#1a1400}
+.pop button{font:inherit;font-size:12.5px;font-weight:700;border:none;border-radius:8px;padding:6px 10px;margin:2px 4px 0 0;cursor:pointer;background:var(--brand);color:var(--brand-ink)}
 .pop button.g{background:#eee;color:#222}
 .loading{padding:60px 10px;text-align:center;color:var(--muted)}
 </style>
@@ -175,8 +185,9 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 <body>
 <div class="wrap">
   <header>
-    <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="12" rx="3" fill="#1a1400"/><rect x="7" y="6" width="10" height="4" rx="1" fill="#f2b300"/><circle cx="8" cy="12.5" r="1" fill="#f2b300"/><circle cx="16" cy="12.5" r="1" fill="#f2b300"/><rect x="11" y="15" width="2" height="7" rx="1" fill="#1a1400"/></svg></div>
+    <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="3" width="16" height="12" rx="3" fill="currentColor"/><rect x="7" y="6" width="10" height="4" rx="1" fill="#fff"/><circle cx="8" cy="12.5" r="1" fill="#fff"/><circle cx="16" cy="12.5" r="1" fill="#fff"/><rect x="11" y="15" width="2" height="7" rx="1" fill="currentColor"/></svg></div>
     <div><h1>Durak</h1><small>İstanbul toplu taşıma · reklamsız</small></div>
+    <button class="themeb" id="themeb" aria-label="Gece moduna geç"></button>
   </header>
   <div class="note">Veri: İBB Açık Veri (İETT otobüs ve metrobüs, metro, Marmaray, tramvay, vapur, minibüs, dolmuş). Saatler tarifeye göredir, araç konumları tahminidir.</div>
   <main id="app"><div class="loading">Hatlar yükleniyor…</div></main>
@@ -208,6 +219,19 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+
+// ================= GÜNDÜZ / GECE MODU =================
+const SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
+const MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
+function setTheme(t){
+  document.documentElement.dataset.theme=t;
+  try{ localStorage.setItem("durak-tema",t); }catch(e){}
+  const b=document.getElementById("themeb");
+  if(b){ b.innerHTML=t==="dark"?SUN:MOON; b.setAttribute("aria-label",t==="dark"?"Gündüz moduna geç":"Gece moduna geç"); }
+  const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=t==="dark"?"#0e131d":"#1f4fd8";
+}
+setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
+document.getElementById("themeb").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
 // ================= TÜRLER VE RENKLER =================
 const TYPES = {
   metro:{ad:"Metro",c:"#d62828"}, marmaray:{ad:"Marmaray",c:"#e07a00"}, tramvay:{ad:"Tramvay",c:"#0b8a5c"},
@@ -462,7 +486,7 @@ function drawMarkers(a,b){
   a=a||M.A; b=b||M.B;
   [mkA,mkB].forEach(m=>m&&m.remove());
   mkA=a&&L.marker(a,{icon:pin("●","#0b8a5c","#fff"),interactive:false}).addTo(map);
-  mkB=b&&L.marker(b,{icon:pin("■","#f2b300","#1a1400"),interactive:false}).addTo(map);
+  mkB=b&&L.marker(b,{icon:pin("■","#f2b705","#1a1400"),interactive:false}).addTo(map);
 }
 // Nereden / Nereye ayarla
 function setEnd(which,ll,name,ids){
