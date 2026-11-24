@@ -913,8 +913,8 @@ function navPhases(o){
   const ss=steps(o), ph=[];
   ss.forEach((s,i)=>{
     if(s.k==="walk"){ const last=i===ss.length-1;
-      if(last) ph.push({k:"walk",to:s.to,txt:"Varış noktasına yürü",last:true});
-      else if(s.m>25) ph.push({k:"walk",to:s.to,txt:s.txt});
+      if(last) ph.push({k:"walk",from:s.from,to:s.to,txt:"Varış noktasına yürü",last:true});
+      else if(s.m>25) ph.push({k:"walk",from:s.from,to:s.to,txt:s.txt});
       return; }
     const pts=s.x.s.slice(s.g.from,s.g.to+1).map(id=>({id,n:STOPS[id].n,p:STOPS[id].p,o:s.x.o[s.g.from+0]}));
     pts.forEach((q,j)=>q.o=s.x.o[s.g.from+j]-s.x.o[s.g.from]);
@@ -930,7 +930,7 @@ async function keepAwake(){ try{ if(NAV&&"wakeLock" in navigator&&document.visib
 document.addEventListener("visibilitychange",()=>{ if(NAV&&document.visibilityState==="visible"){ keepAwake(); navTick(); } });
 function startNav(k){
   const o=M.plans[k]; if(!o) return;
-  NAV={k,o,ph:o.walk?[{k:"walk",to:M.B,txt:"Varış noktasına yürü",last:true},{k:"done"}]:navPhases(o),i:0,ci:0,pos:null,acc:null,fix:0,follow:true,sound:true,said:{},boardAt:null};
+  NAV={k,o,ph:o.walk?[{k:"walk",from:M.A,to:M.B,txt:"Varış noktasına yürü",last:true},{k:"done"}]:navPhases(o),i:0,ci:0,pos:null,acc:null,fix:0,follow:true,sound:true,said:{},boardAt:null};
   mv.classList.add("nav"); navEl().hidden=false; setTimeout(()=>map.invalidateSize(),0);
   keepAwake();
   if(navigator.geolocation){ try{ NAV.watch=navigator.geolocation.watchPosition(p=>{ if(!NAV) return;
@@ -946,13 +946,13 @@ function stopNav(silent){
   if(!NAV) return;
   try{ navigator.geolocation.clearWatch(NAV.watch); }catch(e){} clearInterval(NAV.timer);
   try{ NAV.lock&&NAV.lock.release(); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){}
-  if(NAV.mk){ NAV.mk.remove(); NAV.ac.remove(); }
+  if(NAV.mk){ NAV.mk.remove(); NAV.ac.remove(); } if(NAV.est) NAV.est.remove();
   map.off("dragstart",navDrag);
   NAV=null; navEl().hidden=true; mv.classList.remove("nav"); setTimeout(()=>map.invalidateSize(),0);
 }
 // Yeni adıma geçince sesli/titreşimli bildir
 function navEnter(){
-  const P=NAV.ph[NAV.i]; NAV.ci=0; NAV.said={};
+  const P=NAV.ph[NAV.i]; NAV.ci=0; NAV.said={}; NAV.follow=true;
   if(P.k==="walk") say(P.last?"Varış noktasına yürü":P.txt.replace("Aktarma: ",""));
   else if(P.k==="wait") say(`${P.s.Ln.b} için ${P.s.on} durağında bekle`);
   else if(P.k==="ride"){ NAV.boardAt=nowMin(); say(`${P.pts.length-1} durak sonra, ${P.s.off} durağında in`); }
@@ -963,11 +963,10 @@ const gpsOk=()=>NAV.pos&&Date.now()-NAV.fix<45000&&(NAV.acc||0)<150;
 function navTick(){
   if(!NAV) return;
   const P=NAV.ph[NAV.i], now=nowMin(), pos=NAV.pos;
-  // konum işareti
+  // konum işareti (GPS yoksa adımın yerine göre tahmini konum, içi boş halka)
   if(pos){ if(!NAV.mk){ NAV.ac=L.circle(pos,{radius:NAV.acc||30,color:"#1f6feb",weight:1,fillOpacity:.12,interactive:false}).addTo(map);
       NAV.mk=L.circleMarker(pos,{radius:8,color:"#fff",weight:3,fillColor:"#1f6feb",fillOpacity:1,interactive:false}).addTo(map); }
-    else { NAV.mk.setLatLng(pos); NAV.ac.setLatLng(pos).setRadius(NAV.acc||30); }
-    if(NAV.follow) map.setView(pos,Math.max(map.getZoom(),16),{animate:true}); }
+    else { NAV.mk.setLatLng(pos); NAV.ac.setLatLng(pos).setRadius(NAV.acc||30); } }
   // kendiliğinden ilerleme
   if(gpsOk()){
     if(P.k==="walk"&&hav(pos,P.to)<(P.last?40:35)) return navNext(1);
@@ -984,7 +983,29 @@ function navTick(){
   if(P.k==="ride"){ const rem=P.pts.length-1-NAV.ci;
     if(rem<=1&&!NAV.said.r1){ NAV.said.r1=1; buzz(); say(`Sonraki durakta in: ${P.s.off}`); }
     else if(rem===2&&!NAV.said.r2&&P.pts.length>3){ NAV.said.r2=1; say(`İki durak sonra ineceksin`); } }
+  navCamera();
   navRender();
+}
+// Tahmini konum: GPS varsa o, yoksa bulunulan adımın yeri
+function navWhere(){
+  const P=NAV.ph[NAV.i];
+  if(gpsOk()) return NAV.pos;
+  if(P.k==="walk") return P.from||NAV.pos||P.to;
+  if(P.k==="wait") return P.pts[0].p;
+  if(P.k==="ride") return P.pts[NAV.ci].p;
+  return M.B;
+}
+// Harita her adımda o adımın yerini gösterir: yürürken sen + hedef durak, beklerken durak, araçta bulunduğun yer + ineceğin durak
+function navCamera(){
+  const P=NAV.ph[NAV.i], w=navWhere();
+  if(!gpsOk()){ if(!NAV.est) NAV.est=L.circleMarker(w,{radius:9,color:"#1f6feb",weight:3,dashArray:"3 3",fillOpacity:0,interactive:false}).addTo(map); else NAV.est.setLatLng(w); }
+  else if(NAV.est){ NAV.est.remove(); NAV.est=null; }
+  if(!NAV.follow) return;
+  const fit=(pts,mz)=>{ try{ map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:mz,animate:true}); }catch(e){} };
+  if(P.k==="walk") fit([w,P.to],17);
+  else if(P.k==="wait") map.setView(P.pts[0].p,17,{animate:true});
+  else if(P.k==="ride") fit([w,P.pts[P.pts.length-1].p],16);
+  else map.setView(M.B,17,{animate:true});
 }
 function navRender(){
   const P=NAV.ph[NAV.i], now=nowMin(), pos=NAV.pos, el=navEl();
@@ -1022,7 +1043,7 @@ function navRender(){
   el.innerHTML=`<div class="nt"><div class="ni">${ic}</div><div style="flex:1;min-width:0"><b>${t}</b><div class="ns">${sub}</div>${warn?`<div class="nw">${warn}</div>`:""}</div></div>
     ${alert?`<div class="alert">${alert}</div>`:""}${nx?`<div class="nx">${nx}</div>`:""}
     <div class="nb">${NAV.i>0?`<button data-navnx="-1">‹ Geri</button>`:""}${btn}
-      ${NAV.follow||!pos?"":`<button data-navctr>◎ Ortala</button>`}
+      ${NAV.follow?"":`<button data-navctr>◎ Ortala</button>`}
       <button data-navsnd>${NAV.sound?"🔊":"🔇"}</button>
       ${pos&&P.k!=="done"?`<button data-navre>↻ Buradan yeniden</button>`:""}
       <button data-navstop>✕ Bitir</button></div>`;
