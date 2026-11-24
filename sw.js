@@ -1,5 +1,5 @@
 // Durak servis çalışanı: uygulama kabuğunu ve hat verisini telefonda saklar (internet yokken de açılır).
-const V = "durak-v1";
+const V = "durak-v2";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"];
 self.addEventListener("install", e => {

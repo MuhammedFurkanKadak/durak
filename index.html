@@ -66,6 +66,7 @@ header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:
 .favlines .fl span{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #mapview.det #homeback,#mapview.nav #homeback{display:none}
 #homeback{margin:0 0 6px}
+[hidden]{display:none!important}
 .themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
 .logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -286,6 +287,23 @@ window.addEventListener("popstate",()=>{
 function goHome(){ clearEnd("to"); if(history.state&&history.state.d) try{ history.replaceState(null,""); }catch(e){} }
 function homeBackBtn(){ const b=document.getElementById("homeback"); if(b) b.hidden=!(M.A&&M.B); }
 document.getElementById("homeback").onclick=()=>{ if(history.state&&history.state.d==="plans") history.back(); else goHome(); };
+
+// ================= OTOMATİK GÜNCELLEME =================
+// Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
+// Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
+const APP_VERSION="202611250116";
+async function checkUpdate(){
+  try{
+    const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
+    const m=t.match(/const APP_VERSION="(\d+)"/);
+    if(m&&m[1]!==APP_VERSION&&!NAV){
+      try{ const r=await navigator.serviceWorker.getRegistration(); r&&r.update(); }catch(e){}
+      location.reload();
+    }
+  }catch(e){}
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checkUpdate(); });
+setTimeout(checkUpdate,4000);
 // ================= GÜNDÜZ / GECE MODU =================
 const SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
 const MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>';
