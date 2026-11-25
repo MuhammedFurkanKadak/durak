@@ -237,7 +237,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 <div class="wrap">
   <header>
     <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="3" width="16" height="12" rx="3" fill="currentColor"/><rect x="7" y="6" width="10" height="4" rx="1" fill="#fff"/><circle cx="8" cy="12.5" r="1" fill="#fff"/><circle cx="16" cy="12.5" r="1" fill="#fff"/><rect x="11" y="15" width="2" height="7" rx="1" fill="currentColor"/></svg></div>
-    <div><h1>Durak</h1><small data-t>İstanbul toplu taşıma · reklamsız</small></div>
+    <div><h1>Durak</h1><small><span id="cityn">İstanbul</span> <span id="subt">· reklamsız</span></small></div>
     <button class="themeb langb" id="langb" aria-label="Language / Dil"></button>
     <button class="themeb" id="themeb" aria-label="Gece moduna geç"></button>
   </header>
@@ -273,12 +273,20 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 <script>
 
 
+// ================= ŞEHİR =================
+const CITIES={
+  ist:{ad:"İstanbul",data:"data.json",c:[41.03,29.0],z:11,r:80000,bbox:"27.9,40.8,29.95,41.6",box:[40.5,41.7,27.5,30],sfx:""},
+  izm:{ad:"İzmir",data:"data-izmir.json",c:[38.42,27.14],z:11,r:90000,bbox:"26.2,37.8,27.9,39.1",box:[37.5,39.5,26,28.5],sfx:"-izm"}
+};
+let CITYK=(()=>{ try{ const s=localStorage.getItem("durak-sehir"); if(CITIES[s]) return s; }catch(e){} return "ist"; })();
+const CITY=CITIES[CITYK];
+function setCity(k){ if(!CITIES[k]||k===CITYK) return; try{ localStorage.setItem("durak-sehir",k); }catch(e){} location.reload(); }
 // ================= DİL (Türkçe / English) =================
 // Varsayılan: telefonun dili Türkçe ise TR, değilse EN. Sağ üstteki düğmeyle değişir (sayfa yenilenir).
 let LANG=(()=>{ try{ const s=localStorage.getItem("durak-dil"); if(s==="tr"||s==="en") return s; }catch(e){} return /^tr/i.test(navigator.language||"tr")?"tr":"en"; })();
 document.documentElement.lang=LANG;
 const EN={
-"İstanbul toplu taşıma · reklamsız":"Istanbul public transport · no ads","Hatlar yükleniyor…":"Loading lines…","‹ Geri":"‹ Back",
+"toplu taşıma · reklamsız":"public transport · no ads","reklamsız":"no ads","{0} dışında görünüyorsun. Nereden başlayacağını yaz.":"You seem to be outside {0}. Type where to start.","Konumun {0} içinde görünüyor; şehir değiştiriliyor…":"You seem to be in {0}; switching city…","ücretsiz aktarma":"free transfer","Yetişkin tam İzmirim Kart. ESHOT, metro ve tramvayda 90 dakika içindeki aktarmalar ücretsiz; İZBAN ayrı ücretlidir.":"Adult full fare with İzmirim Kart. Transfers between ESHOT, metro and tram within 90 minutes are free; İZBAN is charged separately.","≈ işaretliler (İZBAN) en yüksek tahmini ücrettir.":"Items marked ≈ (İZBAN) are the highest estimated fare.","Adnan Menderes Havalimanı":"Adnan Menderes Airport","Hatlar yükleniyor…":"Loading lines…","‹ Geri":"‹ Back",
 "Nereden?":"From?","Nereye? Durak, adres ya da yer":"To? Stop, address or place","Başlangıcı temizle":"Clear start","Varışı temizle":"Clear destination",
 "Yer değiştir":"Swap","‹ Seçeneklere dön":"‹ Back to options","Nasıl Giderim":"Directions","Hatlar":"Lines","Duraklar":"Stops","Favoriler":"Favorites",
 "Gündüz moduna geç":"Switch to light mode","Gece moduna geç":"Switch to dark mode",
@@ -345,13 +353,16 @@ function applyStatic(){
   document.querySelectorAll("[data-tp]").forEach(el=>{ if(el.dataset.t0===undefined) el.dataset.t0=el.placeholder; el.placeholder=T(el.dataset.t0); });
   document.querySelectorAll("[data-ta]").forEach(el=>{ if(el.dataset.t0===undefined) el.dataset.t0=el.getAttribute("aria-label"); el.setAttribute("aria-label",T(el.dataset.t0)); });
   const b=document.getElementById("langb"); if(b) b.textContent=LANG==="en"?"TR":"EN";
+  const cn=document.getElementById("cityn"); if(cn) cn.textContent=CITY.ad;
+  const st=document.getElementById("subt"); if(st) st.textContent="· "+T("reklamsız");
+  document.title="Durak – "+CITY.ad;
 }
 applyStatic();
 document.getElementById("langb").onclick=()=>{ LANG=LANG==="en"?"tr":"en"; try{ localStorage.setItem("durak-dil",LANG); }catch(e){} location.reload(); };
 
 // ================= HAVALİMANI =================
 // Ana ekranda iki dokunuşla havalimanına (ya da havalimanındaysan şehre) rota.
-const APT={ist:{sid:"m11_8",kod:"IST",ad:"İstanbul Havalimanı",via:"M11"},saw:{sid:"m4x_3",kod:"SAW",ad:"Sabiha Gökçen",via:"M4"}};
+const APT=CITYK==="izm"?{adb:{sid:"z31",kod:"ADB",ad:"Adnan Menderes Havalimanı",via:"İZBAN"}}:{ist:{sid:"m11_8",kod:"IST",ad:"İstanbul Havalimanı",via:"M11"},saw:{sid:"m4x_3",kod:"SAW",ad:"Sabiha Gökçen",via:"M4"}};
 function airportHTML(){
   return `<h3 class="sec" style="margin-top:6px">✈️ ${T("Havalimanı")}</h3><div class="apt">${Object.entries(APT).filter(([,a])=>STOPS[a.sid]).map(([k,a])=>
     `<button data-apt="${k}"><b>${T(a.ad)}</b><small>${a.kod} · ${a.via}</small></button>`).join("")}</div>`;
@@ -359,7 +370,7 @@ function airportHTML(){
 const nearApt=ll=>ll&&Object.values(APT).some(a=>STOPS[a.sid]&&hav(ll,STOPS[a.sid].p)<3000);
 function goAirport(k){
   const a=APT[k], S=STOPS[a.sid]; if(!S) return;
-  const ids=group(S.n);
+  const ids=near(S.p,500).map(x=>x.id); // istasyon + çevresindeki duraklar (aynı adlı uzak duraklar karışmasın)
   // Zaten o havalimanındaysan: başlangıç havalimanı olsun, varışı sen yaz
   if(myLoc&&hav(myLoc,S.p)<3000&&(!M.A||M.Aname===ME)){ M.B=null; M.Bname=""; M.Bids=null; setEnd("from",S.p,S.n,ids); msg(T("Havalimanındasın: şehirde nereye gideceğini yaz.")); toQ.focus(); return; }
   const go=()=>{ if(!M.A&&myLoc){ M.A=myLoc; M.Aname=ME; M.Aids=null; } setEnd("to",S.p,S.n,ids); };
@@ -368,7 +379,7 @@ function goAirport(k){
 }
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-apt]"); if(!b) return; e.preventDefault(); goAirport(b.dataset.apt); });
 function airportNote(){
-  if(!M.plans||!(nearApt(M.A)||nearApt(M.B))) return "";
+  if(CITYK!=="ist"||!M.plans||!(nearApt(M.A)||nearApt(M.B))) return "";
   return `<div class="faresum" style="margin-top:4px"><span>✈️ ${T("Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.")} <a href="https://hava.ist" target="_blank" rel="noopener">${T("Havaist saatleri")} ›</a></span></div>`;
 }
 
@@ -405,7 +416,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611251500";
+const APP_VERSION="202611251700";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -437,7 +448,7 @@ const TYPES = {
   funikuler:{ad:"Füniküler",c:"#6d597a"}, teleferik:{ad:"Teleferik",c:"#457b9d"}, otobus:{ad:"Otobüs",c:"#1f6feb"}, metrobus:{ad:"Metrobüs",c:"#7b2cbf"}, "raylı":{ad:"Raylı",c:"#e07a00"}
 };
 const METRO_C = {M11:"#0e7c86",M1A:"#e2231a",M1B:"#e2231a",M2:"#009b48",M2A:"#009b48",M3:"#00a3e0",M3A:"#00a3e0",M4:"#e5007d",M5:"#6f2c91",M6:"#b17f4a",M7:"#f29fc5",M8:"#1e3f95",M9:"#d4a800",T1:"#0057a8",T3:"#8b5a2b",T4:"#f28c28",F1:"#6d597a",F2:"#6d597a",F3:"#6d597a"};
-const lc = L => METRO_C[L.b] || (TYPES[L.t]||TYPES.otobus).c;
+const lc = L => L.c || (CITYK==="ist"&&METRO_C[L.b]) || (TYPES[L.t]||TYPES.otobus).c;
 const tad = L => T((TYPES[L.t]||TYPES.otobus).ad);
 const FILTERS = ["hepsi","otobus","metrobus","metro","marmaray","tramvay","vapur","minibus","dolmus","funikuler","teleferik"];
 
@@ -467,7 +478,7 @@ const G=0.005, gk=(la,lo)=>Math.floor(la/G)+":"+Math.floor(lo/G);
 // Kodu bulunamayanlar "MB"/"DM" kalır. Sarıyer hatlarının resmi kodu "SRY".
 const MBKOD={"27196":"C367","28185":"SRY","28182":"SRY","27281":"C74","7514":"SRY","7216":"A27","7217":"A16","7371":"A11","7214":"A41","7272":"A11","7271":"A11","7365":"A31","28184":"SRY","28183":"SRY","28181":"SRY","7508":"SRY","27203":"C307","27366":"ŞL15","27204":"C307","27365":"ŞL16","27363":"ŞL14","27359":"ŞL11","27358":"ŞL10","7485":"ŞL09","7279":"ŞL08","7477":"ŞL07","7275":"ŞL06","27353":"BL401","7364":"BL400","7362":"BL400","7359":"BL400","7366":"BL400","7360":"BL400","7489":"C86","27347":"C125","27208":"C311","27276":"C317","27207":"C311","27206":"C307","27205":"C307","7404":"BL101","7406":"BL101","7467":"BL101","7419":"C56","7388":"C56","7418":"C55","7384":"C55","7383":"C55","7284":"C317","7281":"C312","7250":"C118","7115":"A37","7397":"C66","7263":"A34","7139":"A43","7478":"BL110","7511":"SRY","7261":"C367","7248":"C76","7347":"C91","7336":"C89","7289":"C127","7257":"C78","7378":"C501","7479":"A71","7427":"A11","7238":"C115","7202":"A215","7507":"SRY","7164":"B33","7181":"A24","7412":"BL109","7282":"C307","7260":"C125","7376":"C354","7518":"BL110","7268":"BL200","7256":"C124","7301":"C88","7345":"ŞL01","7373":"C311","7142":"A45","7258":"C125","7439":"A01","7331":"C125","7443":"A28","7481":"ŞL04","7488":"C58","7305":"A30","7391":"C58","7175":"B37","7234":"C310","7299":"A30","7445":"A29","7387":"C56","7194":"C71","7304":"A30","7186":"A16","7442":"A28","7176":"B43","7276":"C312","7307":"A36","7322":"A24","7187":"A48","7138":"A43","7286":"C127","7370":"A08","7343":"C90","7235":"A49","7251":"C124","7152":"B46","7236":"C125","7344":"C91","7183":"A48","7108":"A03","7465":"BL145","7113":"A03","7120":"A239","7122":"A239","7144":"A46","7346":"A28","7121":"A239","7407":"BL103","7396":"C65","7295":"C84","7126":"A02","7483":"ŞL04","7459":"BL145","7313":"A32","7220":"C311","7230":"C309","7246":"C75","7348":"ŞL02","7316":"B43","7198":"A73","7358":"ŞL05","7211":"A72","7174":"C71","7239":"C311","7449":"A32","7204":"A49","7309":"A31","7394":"C64","7308":"A43","7105":"A24","7303":"A24","7209":"C74","7219":"C304","7415":"C311","7302":"A30","7229":"C109","7306":"A03","7300":"A24","7266":"A19","7403":"C70","7327":"C310","7377":"17","7341":"C89","7510":"SRY","7274":"BL202","7259":"C81","7150":"C301","7199":"A201","7213":"A41","7185":"A24","7252":"C76","7461":"BL110","7146":"A46","7136":"A43","7114":"A04","7189":"A27","7486":"A17","7240":"C116","7349":"A24","7277":"C313","7167":"B34","7210":"A72","7484":"C79","7379":"C51","7315":"A07","7287":"C127","7413":"A08","7395":"C65","7297":"C84","7171":"B35","7135":"A43","7455":"A19","7221":"C367","7110":"A03","7487":"A43","7325":"A34","7243":"C75","7441":"BL401","7389":"C65","7233":"C115","7433":"C93","7247":"C76","7241":"A27","7361":"A29","7161":"B33","7163":"B33","7116":"A38","7447":"A29","7253":"C77","7374":"C319","7334":"C125","7296":"A31","7231":"A48","7386":"BL100","7107":"A02","7342":"C125","7357":"C93","7222":"A43","7402":"C70","7380":"C52","7128":"A02","7335":"C89","7337":"C89","7369":"A29","7375":"C351","7165":"B34","7262":"A216","7197":"C72","7448":"A31","7352":"ŞL03","7196":"A71","7140":"A43","7519":"C71","7457":"A03","7201":"A213","7200":"A208","7228":"A43","7178":"A48","7255":"C77","7147":"A47","7339":"A28","7372":"A11","7294":"C83","7270":"A11","7333":"A26","7410":"BL109","7512":"SRY","7227":"C308","7265":"A36","7162":"B33","7212":"A42","7180":"B43","7400":"C70","7242":"C116","7350":"A32","7363":"BL100","7399":"C67","7226":"A43","7285":"A16","7462":"BL145","7356":"C93","7119":"A239","7440":"A03","7480":"C70","7454":"A19","7422":"A28","7367":"BL401","7291":"C127","7117":"A239","7293":"A24","7390":"C58","7191":"A27","7501":"SRY","7224":"A43","7398":"C56","7326":"A24","7245":"C117","7392":"C64","7314":"A35","7414":"BL109","7393":"C64","7298":"C87","7292":"C82","3789":"D22","3743":"D28","3790":"D46","7079":"BŞK3","3753":"D41","3786":"D44","3745":"D11","3805":"D46","3775":"D38","3776":"D41","3750":"D15","3781":"D44","3806":"D15","3755":"D31","3788":"D22","3782":"D30","3779":"D21","3741":"D41","3799":"D11","3749":"D31","3780":"D34","3738":"D44","3778":"D44","3793":"D34","3785":"D61","3744":"D38","3752":"D41","3742":"D21"};
 async function loadData(){
-  const D=await (await fetch("data.json")).json();
+  const D=await (await fetch(CITY.data)).json();
   // iett.istanbul'da sayfası artık olmayan (kaldırılmış) İETT hatları — 25.11.2026 kontrolü
   const KALDIRILAN=new Set("14 16 18 10B 10G 122M 14AK 14ÇK 16S 18A 18F 18E 18M 18Y 18V 18Ü 19ES 19FB 29P 33E 36A 36CY 36M 36TC 76B 89BS 9K ES2 ES3 PD1".split(" "));
   LINES=D.lines.filter(L=>!(L.a==="İETT"&&KALDIRILAN.has(L.b)));
@@ -531,9 +542,9 @@ function nextAt(x,pos,from,n=1){
 
 // ================= FAVORİLER =================
 let fav={h:[],d:[]};
-try{ fav=JSON.parse(localStorage.getItem("durak-fav2"))||fav; }catch(e){}
+try{ fav=JSON.parse(localStorage.getItem("durak-fav2"+CITY.sfx))||fav; }catch(e){}
 const isFav=(k,id)=>fav[k].includes(id);
-function toggleFav(k,id){ fav[k]=isFav(k,id)?fav[k].filter(x=>x!==id):[...fav[k],id]; try{localStorage.setItem("durak-fav2",JSON.stringify(fav));}catch(e){} render(); if(state.tab==="rota") renderPlans(); }
+function toggleFav(k,id){ fav[k]=isFav(k,id)?fav[k].filter(x=>x!==id):[...fav[k],id]; try{localStorage.setItem("durak-fav2"+CITY.sfx,JSON.stringify(fav));}catch(e){} render(); if(state.tab==="rota") renderPlans(); }
 
 // ================= DURUM =================
 let state={tab:"rota",q:"",filtre:"hepsi",line:null,dir:0,stop:null};
@@ -616,7 +627,7 @@ function viewFav(){
 }
 
 // ================= SON YOLCULUKLAR & FAVORİLER (haritanın altı) =================
-let recent=[]; try{ recent=JSON.parse(localStorage.getItem("durak-son"))||[]; }catch(e){}
+let recent=[]; try{ recent=JSON.parse(localStorage.getItem("durak-son"+CITY.sfx))||[]; }catch(e){}
 if(!fav.r) fav.r=[];
 const ME="📍 Konumum";
 const endOf=w=>w==="from"?{ll:M.A,n:M.Aname,st:!!M.Aids}:{ll:M.B,n:M.Bname,st:!!M.Bids};
@@ -626,9 +637,9 @@ function saveRecent(){
   if(!M.A||!M.B) return;
   const t={a:endOf("from"),b:endOf("to"),t:Date.now()}, k=tripKey(t);
   recent=[t,...recent.filter(x=>tripKey(x)!==k)].slice(0,6);
-  try{ localStorage.setItem("durak-son",JSON.stringify(recent)); }catch(e){}
+  try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(e){}
 }
-function saveFav(){ try{ localStorage.setItem("durak-fav2",JSON.stringify(fav)); }catch(e){} }
+function saveFav(){ try{ localStorage.setItem("durak-fav2"+CITY.sfx,JSON.stringify(fav)); }catch(e){} }
 function toggleFavTrip(t){ const k=tripKey(t); fav.r=fav.r.some(x=>tripKey(x)===k)?fav.r.filter(x=>tripKey(x)!==k):[...fav.r,{a:t.a,b:t.b}]; saveFav(); renderPlans(); }
 function runTrip(t){
   const go=()=>{ const r=e=>e.n===ME?[myLoc,ME,null]:[e.ll,e.n,e.st&&BYNAME[e.n]?group(e.n):null];
@@ -704,7 +715,7 @@ async function nameLater(w,ll){
 function fixSavedNames(ll,n){
   let ch=false;
   [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&e.n!==ME&&!e.st&&sameLL(e.ll,ll)&&e.n!==n){ e.n=n; ch=true; } }));
-  if(ch){ try{ localStorage.setItem("durak-son",JSON.stringify(recent)); }catch(e){} saveFav(); if(!M.plans&&!(M.A&&M.B)) renderPlans(); }
+  if(ch){ try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(e){} saveFav(); if(!M.plans&&!(M.A&&M.B)) renderPlans(); }
 }
 function fixOldNames(){
   const todo=[]; [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&(e.n===GENERIC||e.n==="Seçilen nokta"||e.n==="Selected point")&&e.ll) todo.push(e.ll); }));
@@ -714,7 +725,7 @@ function fixOldNames(){
 let map, lineLayer, stopLayer, vehLayer, routeLayer, mkA, mkB, myLoc=null, locAsked=false;
 const M={A:null,B:null,Aname:"",Bname:"",Aids:null,Bids:null,plans:null,sel:null,field:"to"};
 function initMap(){
-  map=L.map("map",{zoomControl:true,preferCanvas:true}).setView([41.03,29.0],11);
+  map=L.map("map",{zoomControl:true,preferCanvas:true}).setView(CITY.c,CITY.z);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
   lineLayer=L.layerGroup().addTo(map); stopLayer=L.layerGroup(); vehLayer=L.layerGroup().addTo(map); routeLayer=L.layerGroup().addTo(map);
   // Raylı sistem ve vapur hatları (arka planda, soluk)
@@ -803,7 +814,10 @@ function askLocation(cb){
   try{
     navigator.geolocation.getCurrentPosition(p=>{
       const ll=[p.coords.latitude,p.coords.longitude];
-      if(hav(ll,[41.02,29.0])>80000){ msg(T("İstanbul dışında görünüyorsun. Nereden başlayacağını yaz.")); return; }
+      if(hav(ll,CITY.c)>CITY.r){
+        const other=Object.keys(CITIES).find(k=>k!==CITYK&&hav(ll,CITIES[k].c)<CITIES[k].r);
+        if(other){ msg(T("Konumun {0} içinde görünüyor; şehir değiştiriliyor…",CITIES[other].ad)); return setTimeout(()=>setCity(other),900); }
+        msg(T("{0} dışında görünüyorsun. Nereden başlayacağını yaz.",CITY.ad)); return; }
       myLoc=ll; if(!M.A||M.Aname==="📍 Konumum") setEnd("from",ll,"📍 Konumum"); if(cb) cb();
     },()=>msg(T("Konum izni verilmedi. Nereden başlayacağını yaz ya da haritada seç.")),{enableHighAccuracy:true,timeout:10000,maximumAge:30000});
   }catch(e){ msg(T("Konum alınamadı.")); }
@@ -1167,8 +1181,23 @@ function minibusFare(L){
   const km=lineKm[L.id];
   return km<=4?43:km<=7?45:km<=11?46:km<=15?47:52; // UKOME: 15 km üstü 52 TL (en yüksek dilim)
 }
+// İzmir (1.4.2026 tarifesi): ESHOT, metro, tramvay tam 35 TL; ilk binişten itibaren 90 dk içindeki aktarmalar ücretsiz. İZBAN tam 40 TL, aktarma dışında (mesafeye göre değişebilir: ≈).
+const IZM={tam:35, izban:40};
+function fareIzm(o){
+  let first=null,total=0,approx=false; const legs=[];
+  for(const g of o.legs){ const L=LINES[g.li]; let f,ap=false;
+    if(L.a==="İZBAN"){ f=IZM.izban; ap=true; }
+    else if(first===null||g.board-first>90){ first=g.board; f=IZM.tam; } else f=0;
+    legs.push({f,ap}); total+=f; approx=approx||ap; }
+  return {legs,total,approx};
+}
+function fareNote(FR){
+  if(CITYK==="izm") return T("Yetişkin tam İzmirim Kart. ESHOT, metro ve tramvayda 90 dakika içindeki aktarmalar ücretsiz; İZBAN ayrı ücretlidir.")+(FR.approx?" "+T("≈ işaretliler (İZBAN) en yüksek tahmini ücrettir."):"");
+  return T("Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs, Marmaray ve M11'de en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.")+(FR.approx?" "+T("≈ işaretliler (minibüs, dolmuş, vapur, M11) en yüksek tahmini ücrettir."):"");
+}
 function fareOf(o){
   if(!o.legs) return {legs:[],total:0,approx:false};
+  if(CITYK==="izm") return fareIzm(o);
   let first=null,k=0,total=0,approx=false; const legs=[];
   for(const g of o.legs){
     const L=LINES[g.li]; let f, ap=false;
@@ -1275,14 +1304,14 @@ function openPlan(k){
     <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname===ME?T(ME):M.Aname||T("Başlangıç"))}</b><span>${(o.mt||metrics(o)).leave-now<=1?T("Hemen yola çık"):T("Yola çık: {0} ({1} sonra)",fmt((o.mt||metrics(o)).leave),dk((o.mt||metrics(o)).leave-now))}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
       <div class="step s-walk"><div class="ic"><span>🚶</span></div><div class="tx"><b>${esc(s.txt)}</b><span data-wk="${s.from.join()+";"+s.to.join()}">${s.m} m · ~${dk(s.dk)}</span></div><div class="tm"></div></div>`:""):`
       <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb${bt(s.Ln).length>4?" long":""}" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
-        <div class="tx"><b>${T("Bin:")} ${esc(s.on)}</b><span>${yonT(esc(s.yon))} · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${tl(FR.legs[ri].f,FR.legs[ri].ap)} · ${T("tam bilet")}</span>`:""}
+        <div class="tx"><b>${T("Bin:")} ${esc(s.on)}</b><span>${yonT(esc(s.yon))} · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${FR.legs[ri].f===0?T("ücretsiz aktarma"):tl(FR.legs[ri].f,FR.legs[ri].ap)+" · "+T("tam bilet")}</span>`:""}
           <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${T("tarifeye göre")}</span>
           ${s.ara.length?`<details><summary>${s.ara.length+1} ${T("durak")} · ~${dk(s.dk)}</summary><div class="ara">${s.ara.map(esc).join(" · ")}</div></details>`:`<span>1 ${T("durak")} · ~${dk(s.dk)}</span>`}
           <b style="margin-top:6px">${T("İn:")} ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
       <div class="step"><div class="ic"><span>🏁</span></div><div class="tx"><b>${esc(M.Bname===ME?T(ME):M.Bname)}</b><span>${T("Varış")}</span></div><div class="tm">${fmt(o.arr)}</div></div>
     </div>
-    ${o.legs?`<div class="faresum"><b>${T("Toplam ücret:")} ${tl(FR.total,FR.approx)}</b><span>${T("Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs, Marmaray ve M11'de en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.")}${FR.approx?" "+T("≈ işaretliler (minibüs, dolmuş, vapur, M11) en yüksek tahmini ücrettir."):""}</span></div>`:""}`;
+    ${o.legs?`<div class="faresum"><b>${T("Toplam ücret:")} ${tl(FR.total,FR.approx)}</b><span>${fareNote(FR)}</span></div>`:""}`;
   d.hidden=false; window.scrollTo(0,0);
 }
 
@@ -1464,14 +1493,14 @@ const placeLabel=f=>{const p=f.properties;
   return {name,sub,ll:[+f.geometry.coordinates[1].toFixed(5),+f.geometry.coordinates[0].toFixed(5)]};};
 async function fetchPlaces(q){
   if(placeCache[q]) return placeCache[q];
-  const u="https://photon.komoot.io/api/?q="+encodeURIComponent(q)+"&limit=6&lat=41.02&lon=29.0&bbox=27.9,40.8,29.95,41.6";
+  const u="https://photon.komoot.io/api/?q="+encodeURIComponent(q)+"&limit=6&lat="+CITY.c[0]+"&lon="+CITY.c[1]+"&bbox="+CITY.bbox;
   const j=await (await fetch(u)).json(); const seen=new Set();
   return placeCache[q]=j.features.map(placeLabel).filter(x=>x.name&&!seen.has(x.name+x.sub)&&seen.add(x.name+x.sub)).slice(0,5);
 }
 // Harita linki ya da koordinattan konum çıkar (Google, Yandex, Apple, "41.01, 28.97")
 function coordFrom(text){
   const t=decodeURIComponent(text||""); let m;
-  const ok1=(la,lo)=>la>40.5&&la<41.7&&lo>27.5&&lo<30?[+(+la).toFixed(5),+(+lo).toFixed(5)]:null;
+  const ok1=(la,lo)=>la>CITY.box[0]&&la<CITY.box[1]&&lo>CITY.box[2]&&lo<CITY.box[3]?[+(+la).toFixed(5),+(+lo).toFixed(5)]:null;
   const ok=(a,b)=>ok1(a,b)||ok1(b,a); // Yandex boylam,enlem sırası kullanır
   if((m=t.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/))) return ok(m[1],m[2]);          // Google yer işareti
   if((m=t.match(/[?&](?:q|ll|daddr|query)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/))) return ok(m[1],m[2]); // Google/Apple ?q=
