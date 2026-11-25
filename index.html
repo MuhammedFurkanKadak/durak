@@ -72,6 +72,8 @@ header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:
 .faresum{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
 .faresum b{display:block;font-size:16px}
 .faresum span{display:block;font-size:12.5px;color:var(--muted);margin-top:4px}
+.langb{margin-left:auto;font:inherit;font-size:13px;font-weight:800;letter-spacing:.02em}
+.langb+.themeb{margin-left:0}
 .themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
 .logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -223,6 +225,11 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .pop b{display:block;margin-bottom:6px}
 .pop button{font:inherit;font-size:12.5px;font-weight:700;border:none;border-radius:8px;padding:6px 10px;margin:2px 4px 0 0;cursor:pointer;background:var(--brand);color:var(--brand-ink)}
 .pop button.g{background:#eee;color:#222}
+.apt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.apt button{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font:inherit;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.apt button b{font-size:14px}
+.apt button small{font-size:12px;color:var(--muted);font-weight:600}
+.faresum a{color:var(--brand);font-weight:700;text-decoration:none}
 .loading{padding:60px 10px;text-align:center;color:var(--muted)}
 </style>
 </head>
@@ -230,24 +237,25 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 <div class="wrap">
   <header>
     <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="3" width="16" height="12" rx="3" fill="currentColor"/><rect x="7" y="6" width="10" height="4" rx="1" fill="#fff"/><circle cx="8" cy="12.5" r="1" fill="#fff"/><circle cx="16" cy="12.5" r="1" fill="#fff"/><rect x="11" y="15" width="2" height="7" rx="1" fill="currentColor"/></svg></div>
-    <div><h1>Durak</h1><small>İstanbul toplu taşıma · reklamsız</small></div>
+    <div><h1>Durak</h1><small data-t>İstanbul toplu taşıma · reklamsız</small></div>
+    <button class="themeb langb" id="langb" aria-label="Language / Dil"></button>
     <button class="themeb" id="themeb" aria-label="Gece moduna geç"></button>
   </header>
-  <main id="app"><div class="loading">Hatlar yükleniyor…</div></main>
+  <main id="app"><div class="loading" data-t>Hatlar yükleniyor…</div></main>
   <section id="mapview" hidden>
-    <button class="back" id="homeback" hidden>‹ Geri</button>
+    <button class="back" id="homeback" data-t hidden>‹ Geri</button>
     <div id="rsearch">
       <div class="od">
         <div class="fields">
-          <label class="field"><span class="dotA"></span><input id="fromQ" placeholder="Nereden?" autocomplete="off"><button class="clr" data-clr="from" aria-label="Başlangıcı temizle" hidden>×</button></label>
-          <label class="field"><span class="dotB"></span><input id="toQ" placeholder="Nereye? Durak, adres ya da yer" autocomplete="off"><button class="clr" data-clr="to" aria-label="Varışı temizle" hidden>×</button></label>
+          <label class="field"><span class="dotA"></span><input id="fromQ" placeholder="Nereden?" data-tp autocomplete="off"><button class="clr" data-clr="from" aria-label="Başlangıcı temizle" data-ta hidden>×</button></label>
+          <label class="field"><span class="dotB"></span><input id="toQ" placeholder="Nereye? Durak, adres ya da yer" data-tp autocomplete="off"><button class="clr" data-clr="to" aria-label="Varışı temizle" data-ta hidden>×</button></label>
         </div>
-        <button class="swapb" id="swap" aria-label="Yer değiştir">⇅</button>
+        <button class="swapb" id="swap" aria-label="Yer değiştir" data-ta>⇅</button>
         <div class="sugg" id="sugg" hidden></div>
       </div>
       <div class="msg" id="msg" hidden></div>
     </div>
-    <div id="dtop" hidden><button class="back" data-dback>‹ Seçeneklere dön</button></div>
+    <div id="dtop" hidden><button class="back" data-dback data-t>‹ Seçeneklere dön</button></div>
     <div id="nav" hidden></div>
     <div id="map"></div>
     <div id="plans"></div>
@@ -255,15 +263,114 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
   </section>
 </div>
 <nav><div class="in">
-  <button data-tab="rota"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h7.5"/></svg>Nasıl Giderim</button>
-  <button data-tab="hatlar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-4M16 21l-1-4"/></svg>Hatlar</button>
-  <button data-tab="duraklar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>Duraklar</button>
-  <button data-tab="favoriler"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>Favoriler</button>
+  <button data-tab="rota"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h7.5"/></svg><span data-t>Nasıl Giderim</span></button>
+  <button data-tab="hatlar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M8 21l1-4M16 21l-1-4"/></svg><span data-t>Hatlar</span></button>
+  <button data-tab="duraklar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg><span data-t>Duraklar</span></button>
+  <button data-tab="favoriler"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg><span data-t>Favoriler</span></button>
 </div></nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 
+
+// ================= DİL (Türkçe / English) =================
+// Varsayılan: telefonun dili Türkçe ise TR, değilse EN. Sağ üstteki düğmeyle değişir (sayfa yenilenir).
+let LANG=(()=>{ try{ const s=localStorage.getItem("durak-dil"); if(s==="tr"||s==="en") return s; }catch(e){} return /^tr/i.test(navigator.language||"tr")?"tr":"en"; })();
+document.documentElement.lang=LANG;
+const EN={
+"İstanbul toplu taşıma · reklamsız":"Istanbul public transport · no ads","Hatlar yükleniyor…":"Loading lines…","‹ Geri":"‹ Back",
+"Nereden?":"From?","Nereye? Durak, adres ya da yer":"To? Stop, address or place","Başlangıcı temizle":"Clear start","Varışı temizle":"Clear destination",
+"Yer değiştir":"Swap","‹ Seçeneklere dön":"‹ Back to options","Nasıl Giderim":"Directions","Hatlar":"Lines","Duraklar":"Stops","Favoriler":"Favorites",
+"Gündüz moduna geç":"Switch to light mode","Gece moduna geç":"Switch to dark mode",
+"Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta.":"Choose where to start: your location, a stop or a point on the map.",
+"Nereye gideceğini yaz ya da haritada bir yere dokun.":"Type where you want to go or tap a place on the map.",
+"Metro":"Metro","Marmaray":"Marmaray","Tramvay":"Tram","Vapur":"Ferry","Minibüs":"Minibus","Dolmuş":"Shared taxi (dolmuş)","Füniküler":"Funicular","Teleferik":"Cable car","Otobüs":"Bus","Metrobüs":"Metrobus","Raylı":"Rail","Hepsi":"All",
+"Şimdi":"Now","şimdi":"now","durak":"stops","Yön":"Direction",
+"Hat ara: M2, Marmaray, Kadıköy…":"Search lines: M2, Marmaray, Kadıköy…","Sonuç bulunamadı.":"No results.",
+"{0} hattan ilk 60'ı gösteriliyor, aramayı daralt.":"Showing the first 60 of {0} lines — narrow your search.",
+"{0} kalkış":"{0} departs","Bugün sefer kalmadı":"No more trips today","Duraklar · sıradaki geçiş saati":"Stops · next arrival",
+"Durak ara: Kadıköy, Taksim…":"Search stops: Kadıköy, Taksim…","Durak bulunamadı.":"No stops found.",
+"{0} duraktan ilk 50'si gösteriliyor, aramayı daralt.":"Showing the first 50 of {0} stops — narrow your search.",
+"{0} hat · saatler tarifeye göre":"{0} lines · times from the timetable","Buraya nasıl giderim?":"How do I get here?",
+"Sonraki:":"Next:","kaldı":"left","Bugün sefer kalmadı.":"No more trips today.",
+"Yolculuklar":"Trips","Nasıl Giderim'deki son yolculuklarda ☆'a dokunarak ekle.":"Add one by tapping ☆ on a recent trip in Directions.",
+"Hat sayfasında ☆'a dokunarak ekle.":"Add one by tapping ☆ on a line page.","Durak sayfasında ☆'a dokunarak ekle.":"Add one by tapping ☆ on a stop page.",
+"az önce":"just now","{0} dk önce":"{0} min ago","{0} sa önce":"{0} h ago","dün":"yesterday","{0} gün önce":"{0} days ago",
+"Konumum":"My location","📍 Konumum":"📍 My location","Nereden:":"From:","Favorilere ekle":"Add to favorites","Son yolculuklar":"Recent trips",
+"Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.":"No trips yet. Choose where to go above.","Durak · buraya git":"Stop · go here","Favoriden çıkar":"Remove from favorites",
+"Son yolculuklardaki ☆ ile sık gittiğin yerleri buraya ekle.":"Use ☆ on recent trips to add places you go often.",
+"{0} yakını":"Near {0}","Seçilen nokta":"Selected point","Buraya git":"Go here","Buradan başla":"Start here","Saatler":"Times",
+"{0} sonra durağında":"at the stop in {0}","Yolculuk sürüyor":"On the way","Bineceğin araç":"Your vehicle","tahmini":"estimated","tahmini konum":"estimated position",
+"Bu cihazda konum yok. Nereden başlayacağını yaz.":"This device has no location. Type where to start.","Konumun alınıyor…":"Getting your location…",
+"İstanbul dışında görünüyorsun. Nereden başlayacağını yaz.":"You seem to be outside Istanbul. Type where to start.",
+"Konum izni verilmedi. Nereden başlayacağını yaz ya da haritada seç.":"Location permission denied. Type where to start or pick on the map.",
+"Konum alınamadı.":"Couldn't get your location.","Geniş arama… %{0} · {1} seçenek":"Wide search… {0}% · {1} options","Rotalar hesaplanıyor…":"Finding routes…",
+"Varış noktasına yürü":"Walk to your destination","{0} durağına yürü":"Walk to {0}","Aktarma: {0} durağına yürü":"Transfer: walk to {0}","Aktarma: ":"Transfer: ",
+"Hemen çık":"Leave now","Çıkış {0} · {1} sonra":"Leave {0} · in {1}","{0} m yürüyüş":"{0} m walk","sonra":"later",
+"En kısa":"Fastest","En erken varış":"Earliest arrival","En az aktarma":"Fewest transfers","En az yürüme":"Least walking",
+"Aktarmasız giden hatlar":"Direct lines","Seçenekler":"Options","Hızlı aramada yol bulunamadı. Aşağıdan geniş arama yapabilirsin.":"No route in the quick search. Try the wide search below.",
+"Diğer seçenekler ({0})":"More options ({0})","Geniş aramada başka seçenek çıkmadı.":"The wide search found nothing else.","Geniş arama…":"Wide search…",
+"Diğer ihtimaller aranıyor…":"Looking for other options…","Tüm seçenekleri göster (geniş arama)":"Show all options (wide search)",
+"Canlı yol tarifini başlat":"Start live directions","çıkış":"leave","varış":"arrive","Toplam":"Total","Aynı güzergâhta {0} seçenek":"{0} options on the same route",
+"Çıkış":"Leave","biniş":"board","gösteriliyor":"shown","seç":"select","Başlangıç":"Start","Hemen yola çık":"Leave now","Yola çık: {0} ({1} sonra)":"Leave at {0} (in {1})",
+"Bin:":"Board:","tam bilet":"full fare","Şimdi kalkıyor":"Departing now","{0}'de kalkıyor ({1} sonra)":"Departs {0} (in {1})","{0} bekleme":"{0} wait","Hemen aktarma":"Immediate transfer",
+"tarifeye göre":"scheduled","İn:":"Get off:","Varış":"Arrival","Toplam ücret:":"Total fare:",
+"Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs, Marmaray ve M11'de en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.":"Adult full fare with Istanbulkart. Transfer discounts within 2 hours applied; metrobus, Marmaray and M11 use the longest-distance fare; İETT night buses (00:30–05:30) cost a double fare.",
+"≈ işaretliler (minibüs, dolmuş, vapur, M11) en yüksek tahmini ücrettir.":"Items marked ≈ (minibus, dolmuş, ferry, M11) are the highest estimated fare.",
+"Konum izni yok":"No location permission","Konum alınamıyor":"Can't get location","Bu cihazda konum yok":"No location on this device",
+"{0} için {1} durağında bekle":"Wait at {1} for {0}","{0} durak sonra, {1} durağında in":"In {0} stops, get off at {1}","Vardın":"You have arrived",
+"Konumun bulundu, takip başladı":"Location found, tracking started","Sonraki durakta in: {0}":"Get off at the next stop: {0}","İki durak sonra ineceksin":"You get off in two stops",
+"sonraki kalkış":"next departures","acele et":"hurry","Planlanan araca ({0}) yetişemeyebilirsin.":"You may miss the planned departure ({0}).",
+"konumun rotadan uzakta":"you are away from the route","Konum bekleniyor…":"Waiting for location…",
+"Seçtiğin başlangıçtan tarif ediliyor. Adımları <b>Vardım / Bindim / İndim</b> ile ilerlet; rotaya yaklaşınca konumun kendiliğinden takip edilir.":"Directions start from the point you chose. Move on with <b>Arrived / On board / Got off</b>; tracking starts automatically when you get near the route.",
+"Vardım":"Arrived","{0} durağında bekle":"Wait at {0}","Sonraki araç:":"Next vehicles:","Bugün başka sefer görünmüyor":"No more trips today","Bindim":"On board",
+"{0} durak sonra in: {1}":"Get off in {0} stops: {1}","Sonraki durak:":"Next stop:","tahmini iniş":"est. arrival","konum yok, tarifeye göre":"no GPS, from timetable",
+"Şimdi in:":"Get off now:","Sonraki durakta inmeye hazırlan":"Get ready to get off at the next stop","İndim":"Got off","Vardın:":"Arrived:","İyi yolculuklar!":"Have a good trip!",
+"Sonra:":"Next:","{0} — {1} durağından bin":"{0} — board at {1}","{0} durak git, {1}'da in":"ride {0} stops, get off at {1}",
+"Ortala":"Center","Buradan yeniden":"Reroute from here","Bitir":"End",
+"Linkteki konum":"Location from link","Link açılıyor…":"Opening link…","Bu linkte konum bulunamadı. Haritada dokunarak seçebilirsin.":"No location found in this link. You can pick on the map.",
+"Linkteki/koordinattaki konumu kullan":"Use the location in this link/coordinates","Haritada seç":"Pick on map","Yerler ve adresler":"Places and addresses","Aranıyor…":"Searching…",
+"Adres bulunamadı":"No address found","Adres araması şu an çalışmıyor":"Address search isn't working right now",
+"Başlangıç için haritada bir yere dokun.":"Tap the map to choose a start.","Gideceğin yer için haritada bir yere dokun.":"Tap the map to choose a destination.",
+"Veri yüklenemedi:":"Couldn't load data:",
+"Havalimanı":"Airport","İstanbul Havalimanı":"Istanbul Airport","Sabiha Gökçen":"Sabiha Gökçen",
+"Havalimanındasın: şehirde nereye gideceğini yaz.":"You're at the airport: type where you're going in the city.",
+"Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.":"Airport coaches (IST: Havaist, SAW: Havabüs) have their own fares and aren't shown in these routes.",
+"Havaist saatleri":"Havaist timetable"
+};
+function T(s,...a){ let r=(LANG==="en"&&EN[s]!==undefined)?EN[s]:s; a.forEach((v,i)=>{ r=r.split("{"+i+"}").join(v); }); return r; }
+const yonT=y=>LANG==="en"?"to "+y:y+" yönü";
+function applyStatic(){
+  document.querySelectorAll("[data-t]").forEach(el=>{ if(el.dataset.t0===undefined) el.dataset.t0=el.textContent; el.textContent=T(el.dataset.t0); });
+  document.querySelectorAll("[data-tp]").forEach(el=>{ if(el.dataset.t0===undefined) el.dataset.t0=el.placeholder; el.placeholder=T(el.dataset.t0); });
+  document.querySelectorAll("[data-ta]").forEach(el=>{ if(el.dataset.t0===undefined) el.dataset.t0=el.getAttribute("aria-label"); el.setAttribute("aria-label",T(el.dataset.t0)); });
+  const b=document.getElementById("langb"); if(b) b.textContent=LANG==="en"?"TR":"EN";
+}
+applyStatic();
+document.getElementById("langb").onclick=()=>{ LANG=LANG==="en"?"tr":"en"; try{ localStorage.setItem("durak-dil",LANG); }catch(e){} location.reload(); };
+
+// ================= HAVALİMANI =================
+// Ana ekranda iki dokunuşla havalimanına (ya da havalimanındaysan şehre) rota.
+const APT={ist:{sid:"m11_8",kod:"IST",ad:"İstanbul Havalimanı",via:"M11"},saw:{sid:"m4x_3",kod:"SAW",ad:"Sabiha Gökçen",via:"M4"}};
+function airportHTML(){
+  return `<h3 class="sec" style="margin-top:6px">✈️ ${T("Havalimanı")}</h3><div class="apt">${Object.entries(APT).filter(([,a])=>STOPS[a.sid]).map(([k,a])=>
+    `<button data-apt="${k}"><b>${T(a.ad)}</b><small>${a.kod} · ${a.via}</small></button>`).join("")}</div>`;
+}
+const nearApt=ll=>ll&&Object.values(APT).some(a=>STOPS[a.sid]&&hav(ll,STOPS[a.sid].p)<3000);
+function goAirport(k){
+  const a=APT[k], S=STOPS[a.sid]; if(!S) return;
+  const ids=group(S.n);
+  // Zaten o havalimanındaysan: başlangıç havalimanı olsun, varışı sen yaz
+  if(myLoc&&hav(myLoc,S.p)<3000&&(!M.A||M.Aname===ME)){ M.B=null; M.Bname=""; M.Bids=null; setEnd("from",S.p,S.n,ids); msg(T("Havalimanındasın: şehirde nereye gideceğini yaz.")); toQ.focus(); return; }
+  const go=()=>{ if(!M.A&&myLoc){ M.A=myLoc; M.Aname=ME; M.Aids=null; } setEnd("to",S.p,S.n,ids); };
+  if(!M.A&&!myLoc) return askLocation(go);
+  go();
+}
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-apt]"); if(!b) return; e.preventDefault(); goAirport(b.dataset.apt); });
+function airportNote(){
+  if(!M.plans||!(nearApt(M.A)||nearApt(M.B))) return "";
+  return `<div class="faresum" style="margin-top:4px"><span>✈️ ${T("Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.")} <a href="https://hava.ist" target="_blank" rel="noopener">${T("Havaist saatleri")} ›</a></span></div>`;
+}
 
 // ================= UYGULAMA OLARAK YÜKLEME (PWA) =================
 if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));
@@ -278,7 +385,7 @@ function clearEnd(w){
   if(M.sel!==null||!document.getElementById("detail").hidden) showList();
   routeLayer.clearLayers(); if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
   drawMarkers(); clrBtns(); homeBackBtn(); renderPlans(); sugg.hidden=true;
-  msg(!M.A?"Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta.":"Nereye gideceğini yaz ya da haritada bir yere dokun.");
+  msg(!M.A?T("Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta."):T("Nereye gideceğini yaz ya da haritada bir yere dokun."));
 }
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-clr]"); if(!b) return; e.preventDefault(); e.stopPropagation();
   clearEnd(b.dataset.clr); (b.dataset.clr==="from"?fromQ:toQ).focus(); },true);
@@ -298,7 +405,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611251107";
+const APP_VERSION="202611251500";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -318,7 +425,7 @@ function setTheme(t){
   document.documentElement.dataset.theme=t;
   try{ localStorage.setItem("durak-tema",t); }catch(e){}
   const b=document.getElementById("themeb");
-  if(b){ b.innerHTML=t==="dark"?SUN:MOON; b.setAttribute("aria-label",t==="dark"?"Gündüz moduna geç":"Gece moduna geç"); }
+  if(b){ b.innerHTML=t==="dark"?SUN:MOON; b.setAttribute("aria-label",T(t==="dark"?"Gündüz moduna geç":"Gece moduna geç")); }
   const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=t==="dark"?"#0e131d":"#1f4fd8";
 }
 setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
@@ -329,9 +436,9 @@ const TYPES = {
   vapur:{ad:"Vapur",c:"#0077b6"}, minibus:{ad:"Minibüs",c:"#2a9d8f"}, dolmus:{ad:"Dolmuş",c:"#8d5524"},
   funikuler:{ad:"Füniküler",c:"#6d597a"}, teleferik:{ad:"Teleferik",c:"#457b9d"}, otobus:{ad:"Otobüs",c:"#1f6feb"}, metrobus:{ad:"Metrobüs",c:"#7b2cbf"}, "raylı":{ad:"Raylı",c:"#e07a00"}
 };
-const METRO_C = {M1A:"#e2231a",M1B:"#e2231a",M2:"#009b48",M2A:"#009b48",M3:"#00a3e0",M3A:"#00a3e0",M4:"#e5007d",M5:"#6f2c91",M6:"#b17f4a",M7:"#f29fc5",M8:"#1e3f95",M9:"#d4a800",T1:"#0057a8",T3:"#8b5a2b",T4:"#f28c28",F1:"#6d597a",F2:"#6d597a",F3:"#6d597a"};
+const METRO_C = {M11:"#0e7c86",M1A:"#e2231a",M1B:"#e2231a",M2:"#009b48",M2A:"#009b48",M3:"#00a3e0",M3A:"#00a3e0",M4:"#e5007d",M5:"#6f2c91",M6:"#b17f4a",M7:"#f29fc5",M8:"#1e3f95",M9:"#d4a800",T1:"#0057a8",T3:"#8b5a2b",T4:"#f28c28",F1:"#6d597a",F2:"#6d597a",F3:"#6d597a"};
 const lc = L => METRO_C[L.b] || (TYPES[L.t]||TYPES.otobus).c;
-const tad = L => (TYPES[L.t]||TYPES.otobus).ad;
+const tad = L => T((TYPES[L.t]||TYPES.otobus).ad);
 const FILTERS = ["hepsi","otobus","metrobus","metro","marmaray","tramvay","vapur","minibus","dolmus","funikuler","teleferik"];
 
 // ================= YARDIMCILAR =================
@@ -340,9 +447,10 @@ const norm=s=>s.toLocaleLowerCase("tr").replace(/ı/g,"i").normalize("NFD").repl
 const fmt=m=>{m=Math.round(m);m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")};
 const nowMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()+d.getSeconds()/60};
 // Süreleri okunur yaz: 45 dk, 1 sa 20 dk
-const dk=m=>{m=Math.max(0,Math.round(m)); if(m<60) return m+" dk"; const h=Math.floor(m/60), r=m%60; return h+" sa"+(r?" "+r+" dk":"");};
-const dkBig=m=>{m=Math.max(0,Math.round(m)); if(m<60) return `${m}<small> dk</small>`; const h=Math.floor(m/60), r=m%60; return `${h}<small> sa</small>`+(r?` ${r}<small> dk</small>`:"");};
-const inMin=t=>{const x=Math.round(t-nowMin());return x<=0?"Şimdi":dk(x)};
+const DK=()=>LANG==="en"?" min":" dk", SA=()=>LANG==="en"?" h":" sa";
+const dk=m=>{m=Math.max(0,Math.round(m)); if(m<60) return m+DK(); const h=Math.floor(m/60), r=m%60; return h+SA()+(r?" "+r+DK():"");};
+const dkBig=m=>{m=Math.max(0,Math.round(m)); if(m<60) return `${m}<small>${DK()}</small>`; const h=Math.floor(m/60), r=m%60; return `${h}<small>${SA()}</small>`+(r?` ${r}<small>${DK()}</small>`:"");};
+const inMin=t=>{const x=Math.round(t-nowMin());return x<=0?T("Şimdi"):dk(x)};
 const hav=(a,b)=>{const r=Math.PI/180,dLa=(b[0]-a[0])*r,dLo=(b[1]-a[1])*r;const s=Math.sin(dLa/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLo/2)**2;return 2*6371000*Math.asin(Math.sqrt(s));};
 const walkMin=m=>Math.max(1,Math.round(m*1.3/80));
 // Rozet içeriği: Marmaray için adı (resmi logo kullanılmıyor), diğerlerinde hat kodu
@@ -436,16 +544,16 @@ function go(p){ state={...state,...p}; render(); window.scrollTo(0,0); }
 function viewLines(){
   const q=norm(state.q);
   const ls=LINES.filter(L=>(state.filtre==="hepsi"||L.t===state.filtre)&&(!q||L._n.includes(q)));
-  const chips=FILTERS.map(k=>`<button class="chip ${state.filtre===k?"on":""}" data-f="${k}">${k==="hepsi"?"Hepsi":TYPES[k].ad}</button>`).join("");
+  const chips=FILTERS.map(k=>`<button class="chip ${state.filtre===k?"on":""}" data-f="${k}">${T(k==="hepsi"?"Hepsi":TYPES[k].ad)}</button>`).join("");
   return `<div class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-  <input id="q" placeholder="Hat ara: M2, Marmaray, Kadıköy…" value="${esc(state.q)}" autocomplete="off"></div>
+  <input id="q" placeholder="${T("Hat ara: M2, Marmaray, Kadıköy…")}" value="${esc(state.q)}" autocomplete="off"></div>
   <div class="chips">${chips}</div>
   <div class="list">${ls.slice(0,60).map(L=>`
     <div class="item" data-line="${L.id}">${badge(L)}
-      <div class="t"><b>${esc(L.n)}</b><span>${tad(L)} · ${L.dir[0].s.length} durak${L.a?" · "+esc(L.a):""}</span></div>
+      <div class="t"><b>${esc(L.n)}</b><span>${tad(L)} · ${L.dir[0].s.length} ${T("durak")}${L.a?" · "+esc(L.a):""}</span></div>
       <button class="star ${isFav("h",L.id)?"on":""}" data-fh="${L.id}">${isFav("h",L.id)?"★":"☆"}</button>
-    </div>`).join("")||`<div class="empty">Sonuç bulunamadı.</div>`}</div>
-  ${ls.length>60?`<div class="more">${ls.length} hattan ilk 60'ı gösteriliyor, aramayı daralt.</div>`:""}`;
+    </div>`).join("")||`<div class="empty">${T("Sonuç bulunamadı.")}</div>`}</div>
+  ${ls.length>60?`<div class="more">${T("{0} hattan ilk 60'ı gösteriliyor, aramayı daralt.",ls.length)}</div>`:""}`;
 }
 
 function viewLine(){
@@ -453,13 +561,13 @@ function viewLine(){
   const di=Math.min(state.dir,L.dir.length-1), x=L.dir[di], now=nowMin();
   const nx=nextAt(x,0,now,3);
   const shown=L.dir.map((d,i)=>[d,i]).filter(([d])=>d.m!==0); const opts=shown.length?shown:L.dir.slice(0,2).map((d,i)=>[d,i]);
-  const seg=opts.length>1?`<div class="seg">${opts.map(([d,i])=>`<button class="${i===di?"on":""}" data-dir="${i}">${esc(d.h||STOPS[d.s[d.s.length-1]]?.n||"Yön "+(i+1))} yönü</button>`).join("")}</div>`:"";
-  return `<button class="back" data-back>‹ Geri</button>
-  <div class="hero"><div class="row">${badge(L)}<div style="flex:1;min-width:0"><h2>${esc(L.n)}</h2><p>${tad(L)}${L.a?" · "+esc(L.a):""} · ${x.s.length} durak · ~${dk(x.o[x.o.length-1])}</p></div>
+  const seg=opts.length>1?`<div class="seg">${opts.map(([d,i])=>`<button class="${i===di?"on":""}" data-dir="${i}">${yonT(esc(d.h||STOPS[d.s[d.s.length-1]]?.n||T("Yön")+" "+(i+1)))}</button>`).join("")}</div>`:"";
+  return `<button class="back" data-back>${T("‹ Geri")}</button>
+  <div class="hero"><div class="row">${badge(L)}<div style="flex:1;min-width:0"><h2>${esc(L.n)}</h2><p>${tad(L)}${L.a?" · "+esc(L.a):""} · ${x.s.length} ${T("durak")} · ~${dk(x.o[x.o.length-1])}</p></div>
     <button class="star ${isFav("h",L.id)?"on":""}" data-fh="${L.id}">${isFav("h",L.id)?"★":"☆"}</button></div>${seg}
-    <div class="next">${nx.length?nx.map(t=>`<div><b>${inMin(t)}</b><span>${fmt(t)} kalkış</span></div>`).join(""):`<div><b>—</b><span>Bugün sefer kalmadı</span></div>`}</div>
+    <div class="next">${nx.length?nx.map(t=>`<div><b>${inMin(t)}</b><span>${T("{0} kalkış",fmt(t))}</span></div>`).join(""):`<div><b>—</b><span>${T("Bugün sefer kalmadı")}</span></div>`}</div>
   </div>
-  <h3 class="sec" style="margin-top:0">Duraklar · sıradaki geçiş saati</h3>
+  <h3 class="sec" style="margin-top:0">${T("Duraklar · sıradaki geçiş saati")}</h3>
   <div class="stops" style="--c:${lc(L)}">${x.s.map((sid,pos)=>{
     const S=STOPS[sid]; if(!S) return ""; const t=nextAt(x,pos,now)[0];
     const others=linesAtName(S.n).filter(o=>o!==L).slice(0,6);
@@ -471,11 +579,11 @@ function viewStops(){
   const sc=n=>{const x=norm(n);return x===q?0:x.startsWith(q)?1:2;};
   const ns=q?NAMES.filter(n=>norm(n).includes(q)).sort((a,b)=>sc(a)-sc(b)||a.length-b.length):NAMES;
   return `<div class="search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-  <input id="q" placeholder="Durak ara: Kadıköy, Taksim…" value="${esc(state.q)}" autocomplete="off"></div>
+  <input id="q" placeholder="${T("Durak ara: Kadıköy, Taksim…")}" value="${esc(state.q)}" autocomplete="off"></div>
   <div class="list">${ns.slice(0,50).map(n=>`
     <div class="item" data-stop="${esc(n)}"><div class="t"><b>${esc(n)}</b><div class="mini" style="margin-top:4px">${linesAtName(n).slice(0,8).map(mini).join("")}</div></div>
-    <button class="star ${isFav("d",n)?"on":""}" data-fd="${esc(n)}">${isFav("d",n)?"★":"☆"}</button></div>`).join("")||`<div class="empty">Durak bulunamadı.</div>`}</div>
-  ${ns.length>50?`<div class="more">${ns.length} duraktan ilk 50'si gösteriliyor, aramayı daralt.</div>`:""}`;
+    <button class="star ${isFav("d",n)?"on":""}" data-fd="${esc(n)}">${isFav("d",n)?"★":"☆"}</button></div>`).join("")||`<div class="empty">${T("Durak bulunamadı.")}</div>`}</div>
+  ${ns.length>50?`<div class="more">${T("{0} duraktan ilk 50'si gösteriliyor, aramayı daralt.",ns.length)}</div>`:""}`;
 }
 
 function viewStop(){
@@ -486,25 +594,25 @@ function viewStop(){
     deps.push({L,di,t,yon:x.h||STOPS[x.s[x.s.length-1]]?.n||""});
   }));
   deps.sort((a,b)=>a.t[0]-b.t[0]);
-  return `<button class="back" data-back>‹ Geri</button>
-  <div class="hero"><div class="row"><div style="flex:1"><h2>${esc(n)}</h2><p>${linesAtName(n).length} hat · saatler tarifeye göre</p></div>
+  return `<button class="back" data-back>${T("‹ Geri")}</button>
+  <div class="hero"><div class="row"><div style="flex:1"><h2>${esc(n)}</h2><p>${T("{0} hat · saatler tarifeye göre",linesAtName(n).length)}</p></div>
   <button class="star ${isFav("d",n)?"on":""}" data-fd="${esc(n)}">${isFav("d",n)?"★":"☆"}</button></div>
-  <button class="btn" style="width:100%;margin-top:12px" data-goto="${esc(n)}">Buraya nasıl giderim?</button></div>
+  <button class="btn" style="width:100%;margin-top:12px" data-goto="${esc(n)}">${T("Buraya nasıl giderim?")}</button></div>
   <div class="stops">${deps.slice(0,30).map(x=>`
     <div class="dep" data-line="${x.L.id}" data-d="${x.di}">${badge(x.L)}
-      <div class="t"><b>${esc(x.yon)} yönü</b><span>${x.L.t==="minibus"||x.L.t==="dolmus"?esc(x.L.n)+" · ":""}Sonraki: ${x.t.map(fmt).join(", ")}</span></div>
-      <div class="m">${inMin(x.t[0])}<small>kaldı</small></div></div>`).join("")||`<div class="empty">Bugün sefer kalmadı.</div>`}</div>`;
+      <div class="t"><b>${yonT(esc(x.yon))}</b><span>${x.L.t==="minibus"||x.L.t==="dolmus"?esc(x.L.n)+" · ":""}${T("Sonraki:")} ${x.t.map(fmt).join(", ")}</span></div>
+      <div class="m">${inMin(x.t[0])}<small>${T("kaldı")}</small></div></div>`).join("")||`<div class="empty">${T("Bugün sefer kalmadı.")}</div>`}</div>`;
 }
 
 function viewFav(){
   const hs=LINES.filter(L=>isFav("h",L.id));
-  return `<h3 class="sec">Yolculuklar</h3><div class="list">${(fav.r||[]).map((t,i)=>tripRow(t,"data-favtrip",i,true)).join("")||`<div class="empty">Nasıl Giderim'deki son yolculuklarda ☆'a dokunarak ekle.</div>`}</div>
-  <h3 class="sec">Hatlar</h3><div class="list">${hs.map(L=>`
+  return `<h3 class="sec">${T("Yolculuklar")}</h3><div class="list">${(fav.r||[]).map((t,i)=>tripRow(t,"data-favtrip",i,true)).join("")||`<div class="empty">${T("Nasıl Giderim'deki son yolculuklarda ☆'a dokunarak ekle.")}</div>`}</div>
+  <h3 class="sec">${T("Hatlar")}</h3><div class="list">${hs.map(L=>`
     <div class="item" data-line="${L.id}">${badge(L)}<div class="t"><b>${esc(L.n)}</b><span>${tad(L)}</span></div>
-    <button class="star on" data-fh="${L.id}">★</button></div>`).join("")||`<div class="empty">Hat sayfasında ☆'a dokunarak ekle.</div>`}</div>
-  <h3 class="sec">Duraklar</h3><div class="list">${fav.d.map(n=>`
+    <button class="star on" data-fh="${L.id}">★</button></div>`).join("")||`<div class="empty">${T("Hat sayfasında ☆'a dokunarak ekle.")}</div>`}</div>
+  <h3 class="sec">${T("Duraklar")}</h3><div class="list">${fav.d.map(n=>`
     <div class="item" data-stop="${esc(n)}"><div class="t"><b>${esc(n)}</b><div class="mini" style="margin-top:4px">${linesAtName(n).slice(0,8).map(mini).join("")}</div></div>
-    <button class="star on" data-fd="${esc(n)}">★</button></div>`).join("")||`<div class="empty">Durak sayfasında ☆'a dokunarak ekle.</div>`}</div>`;
+    <button class="star on" data-fd="${esc(n)}">★</button></div>`).join("")||`<div class="empty">${T("Durak sayfasında ☆'a dokunarak ekle.")}</div>`}</div>`;
 }
 
 // ================= SON YOLCULUKLAR & FAVORİLER (haritanın altı) =================
@@ -528,22 +636,22 @@ function runTrip(t){
   if((t.a.n===ME||t.b.n===ME)&&!myLoc) return askLocation(go);
   go();
 }
-const ago=ms=>{ const m=Math.round((Date.now()-ms)/60000); if(m<1) return "az önce"; if(m<60) return m+" dk önce"; const h=Math.round(m/60); if(h<24) return h+" sa önce"; const d=Math.round(h/24); return d===1?"dün":d+" gün önce"; };
-const nmE=e=>e.n===ME?"Konumum":e.n;
+const ago=ms=>{ const m=Math.round((Date.now()-ms)/60000); if(m<1) return T("az önce"); if(m<60) return T("{0} dk önce",m); const h=Math.round(m/60); if(h<24) return T("{0} sa önce",h); const d=Math.round(h/24); return d===1?T("dün"):T("{0} gün önce",d); };
+const nmE=e=>e.n===ME?T("Konumum"):e.n;
 const IC_CLOCK='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 const IC_STAR='<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>';
 const IC_PIN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
 function tripRow(t,attr,i,isF){
-  return `<div class="item trip" ${attr}="${i}"><span class="hico${isF?" f":""}">${isF?IC_STAR:IC_CLOCK}</span><div class="t"><b>${esc(nmE(t.b))}</b><span>Nereden: ${esc(nmE(t.a))}${t.t?" · "+ago(t.t):""}</span></div>
-    <button class="star ${fav.r.some(x=>tripKey(x)===tripKey(t))?"on":""}" data-ftrip="${attr}:${i}" aria-label="Favorilere ekle">${fav.r.some(x=>tripKey(x)===tripKey(t))?"★":"☆"}</button></div>`;
+  return `<div class="item trip" ${attr}="${i}"><span class="hico${isF?" f":""}">${isF?IC_STAR:IC_CLOCK}</span><div class="t"><b>${esc(nmE(t.b))}</b><span>${T("Nereden:")} ${esc(nmE(t.a))}${t.t?" · "+ago(t.t):""}</span></div>
+    <button class="star ${fav.r.some(x=>tripKey(x)===tripKey(t))?"on":""}" data-ftrip="${attr}:${i}" aria-label="${T("Favorilere ekle")}">${fav.r.some(x=>tripKey(x)===tripKey(t))?"★":"☆"}</button></div>`;
 }
 function homeHTML(){
   const hs=LINES.filter(L=>isFav("h",L.id));
-  let h=`<h3 class="sec" style="margin-top:6px">Son yolculuklar</h3><div class="list">${recent.map((t,i)=>tripRow(t,"data-trip",i,false)).join("")||`<div class="empty" style="padding:16px">Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.</div>`}</div>`;
-  h+=`<h3 class="sec">Favoriler</h3><div class="list">`;
+  let h=airportHTML()+`<h3 class="sec" style="margin-top:6px">${T("Son yolculuklar")}</h3><div class="list">${recent.map((t,i)=>tripRow(t,"data-trip",i,false)).join("")||`<div class="empty" style="padding:16px">${T("Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.")}</div>`}</div>`;
+  h+=`<h3 class="sec">${T("Favoriler")}</h3><div class="list">`;
   const items=fav.r.map((t,i)=>tripRow(t,"data-favtrip",i,true))
-    .concat(fav.d.map(n=>`<div class="item trip" data-gostop="${esc(n)}"><span class="hico f">${IC_PIN}</span><div class="t"><b>${esc(n)}</b><span>Durak · buraya git</span></div><button class="star on" data-fd="${esc(n)}" aria-label="Favoriden çıkar">★</button></div>`));
-  h+=items.join("")||`<div class="empty" style="padding:16px">Son yolculuklardaki ☆ ile sık gittiğin yerleri buraya ekle.</div>`;
+    .concat(fav.d.map(n=>`<div class="item trip" data-gostop="${esc(n)}"><span class="hico f">${IC_PIN}</span><div class="t"><b>${esc(n)}</b><span>${T("Durak · buraya git")}</span></div><button class="star on" data-fd="${esc(n)}" aria-label="${T("Favoriden çıkar")}">★</button></div>`));
+  h+=items.join("")||`<div class="empty" style="padding:16px">${T("Son yolculuklardaki ☆ ile sık gittiğin yerleri buraya ekle.")}</div>`;
   h+=`</div>`;
   if(hs.length) h+=`<div class="favlines">${hs.map(L=>`<button class="fl" data-line="${L.id}">${badge(L)}<span>${esc(L.n)}</span></button>`).join("")}</div>`;
   return h;
@@ -568,7 +676,7 @@ document.addEventListener("click",e=>{
 // ================= SEÇİLEN NOKTANIN ADI =================
 // Haritadan seçilen yere hemen en yakın durağa göre bir ad ver, sonra adres/mekân adını (OpenStreetMap) getir.
 const GENERIC="Haritada seçilen nokta";
-function quickName(ll){ const n=near(ll,500)[0]; return n?`${STOPS[n.id].n} yakını`:"Seçilen nokta"; }
+function quickName(ll){ const n=near(ll,500)[0]; return n?T("{0} yakını",STOPS[n.id].n):T("Seçilen nokta"); }
 const revCache={};
 async function revName(ll){
   const k=ll.map(x=>(+x).toFixed(4)).join(",");
@@ -599,7 +707,7 @@ function fixSavedNames(ll,n){
   if(ch){ try{ localStorage.setItem("durak-son",JSON.stringify(recent)); }catch(e){} saveFav(); if(!M.plans&&!(M.A&&M.B)) renderPlans(); }
 }
 function fixOldNames(){
-  const todo=[]; [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&(e.n===GENERIC||e.n==="Seçilen nokta")&&e.ll) todo.push(e.ll); }));
+  const todo=[]; [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&(e.n===GENERIC||e.n==="Seçilen nokta"||e.n==="Selected point")&&e.ll) todo.push(e.ll); }));
   todo.slice(0,8).forEach((ll,i)=>setTimeout(async()=>fixSavedNames(ll,await revName(ll)),300*i));
 }
 // ================= HARİTA =================
@@ -621,7 +729,7 @@ function initMap(){
     const b=map.getBounds(), c=b.getCenter(), r=Math.min(2500,map.distance(c,b.getNorthEast()));
     near([c.lat,c.lng],r).slice(0,600).forEach(({id})=>{ const S=STOPS[id];
       L.circleMarker(S.p,{radius:4,color:"#333",weight:1,fillColor:"#fff",fillOpacity:1})
-        .bindPopup(`<div class="pop"><b>${esc(S.n)}</b><button data-pick="to" data-sid="${S.id}">Buraya git</button><button class="g" data-pick="from" data-sid="${S.id}">Buradan başla</button><button class="g" data-pop-stop="${esc(S.n)}">Saatler</button></div>`)
+        .bindPopup(`<div class="pop"><b>${esc(S.n)}</b><button data-pick="to" data-sid="${S.id}">${T("Buraya git")}</button><button class="g" data-pick="from" data-sid="${S.id}">${T("Buradan başla")}</button><button class="g" data-pop-stop="${esc(S.n)}">${T("Saatler")}</button></div>`)
         .addTo(stopLayer); });
     stopLayer.addTo(map);
   };
@@ -630,7 +738,7 @@ function initMap(){
   map.on("click",e=>{
     if(M.sel!==null) return;
     const ll=[+e.latlng.lat.toFixed(5),+e.latlng.lng.toFixed(5)];
-    L.popup().setLatLng(ll).setContent(`<div class="pop"><b>Seçilen nokta</b><button data-pick="to" data-ll="${ll}">Buraya git</button><button class="g" data-pick="from" data-ll="${ll}">Buradan başla</button></div>`).openOn(map);
+    L.popup().setLatLng(ll).setContent(`<div class="pop"><b>${T("Seçilen nokta")}</b><button data-pick="to" data-ll="${ll}">${T("Buraya git")}</button><button class="g" data-pick="from" data-ll="${ll}">${T("Buradan başla")}</button></div>`).openOn(map);
   });
   drawVehicles(); setInterval(drawVehicles,3000);
   renderPlans(); setTimeout(fixOldNames,1500);
@@ -651,8 +759,8 @@ function drawVehicles(){
       const A=STOPS[x.s[i]], B=STOPS[x.s[i+1]]; if(!A||!B) return;
       const f=Math.min(1,Math.max(0,(e-x.o[i])/((x.o[i+1]-x.o[i])||1)));
       const p=[A.la+(B.la-A.la)*f, A.lo+(B.lo-A.lo)*f];
-      const txt=e<x.o[g.from]?`${inMin(g.board)} sonra durağında`:"Yolculuk sürüyor";
-      L.marker(p,{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${lc(Ln)};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%);display:inline-block">${({metro:"🚇",marmaray:"🚆",tramvay:"🚊",vapur:"⛴",minibus:"🚐",dolmus:"🚐",otobus:"🚌",metrobus:"🚌",funikuler:"🚞",teleferik:"🚡"})[Ln.t]||"🚍"} ${bt(Ln)}</span>`,iconSize:[0,0]})}).bindTooltip(`Bineceğin araç · ${txt} · tahmini`).addTo(vehLayer);
+      const txt=e<x.o[g.from]?T("{0} sonra durağında",inMin(g.board)):T("Yolculuk sürüyor");
+      L.marker(p,{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${lc(Ln)};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%);display:inline-block">${({metro:"🚇",marmaray:"🚆",tramvay:"🚊",vapur:"⛴",minibus:"🚐",dolmus:"🚐",otobus:"🚌",metrobus:"🚌",funikuler:"🚞",teleferik:"🚡"})[Ln.t]||"🚍"} ${bt(Ln)}</span>`,iconSize:[0,0]})}).bindTooltip(`${T("Bineceğin araç")} · ${txt} · ${T("tahmini")}`).addTo(vehLayer);
     });
     return;
   }
@@ -667,7 +775,7 @@ function drawVehicles(){
         const A=STOPS[x.s[i]], B=STOPS[x.s[i+1]]; if(!A||!B) continue;
         const span=(x.o[i+1]-x.o[i])||1, f=Math.min(1,Math.max(0,(e-x.o[i])/span));
         const p=[A.la+(B.la-A.la)*f, A.lo+(B.lo-A.lo)*f]; if(!b.contains(p)) continue;
-        L.circleMarker(p,{radius:5,color:"#fff",weight:2,fillColor:lc(Ln),fillOpacity:1}).bindTooltip(Ln.b+" · tahmini konum").addTo(vehLayer);
+        L.circleMarker(p,{radius:5,color:"#fff",weight:2,fillColor:lc(Ln),fillOpacity:1}).bindTooltip(Ln.b+" · "+T("tahmini konum")).addTo(vehLayer);
       }
     });
   });
@@ -683,22 +791,22 @@ function drawMarkers(a,b){
 // Nereden / Nereye ayarla
 function setEnd(which,ll,name,ids){
   if(which==="from"){ M.A=ll; M.Aname=name; M.Aids=ids||null; } else { M.B=ll; M.Bname=name; M.Bids=ids||null; }
-  fromQ.value=M.Aname; toQ.value=M.Bname; clrBtns(); homeBackBtn();
+  fromQ.value=M.Aname===ME?T(ME):M.Aname; toQ.value=M.Bname===ME?T(ME):M.Bname; clrBtns(); homeBackBtn();
   map.closePopup(); sugg.hidden=true; drawMarkers();
   if(M.A&&M.B){ lineLayer.remove(); computePlans(); }
   else { M.plans=null; renderPlans(); if(ll) map.setView(ll,Math.max(map.getZoom(),14));
-    msg(!M.A?"Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta.":"Nereye gideceğini yaz ya da haritada bir yere dokun."); }
+    msg(!M.A?T("Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta."):T("Nereye gideceğini yaz ya da haritada bir yere dokun.")); }
 }
 function askLocation(cb){
-  if(!navigator.geolocation){ msg("Bu cihazda konum yok. Nereden başlayacağını yaz."); return; }
-  msg("Konumun alınıyor…");
+  if(!navigator.geolocation){ msg(T("Bu cihazda konum yok. Nereden başlayacağını yaz.")); return; }
+  msg(T("Konumun alınıyor…"));
   try{
     navigator.geolocation.getCurrentPosition(p=>{
       const ll=[p.coords.latitude,p.coords.longitude];
-      if(hav(ll,[41.02,29.0])>80000){ msg("İstanbul dışında görünüyorsun. Nereden başlayacağını yaz."); return; }
+      if(hav(ll,[41.02,29.0])>80000){ msg(T("İstanbul dışında görünüyorsun. Nereden başlayacağını yaz.")); return; }
       myLoc=ll; if(!M.A||M.Aname==="📍 Konumum") setEnd("from",ll,"📍 Konumum"); if(cb) cb();
-    },()=>msg("Konum izni verilmedi. Nereden başlayacağını yaz ya da haritada seç."),{enableHighAccuracy:true,timeout:10000,maximumAge:30000});
-  }catch(e){ msg("Konum alınamadı."); }
+    },()=>msg(T("Konum izni verilmedi. Nereden başlayacağını yaz ya da haritada seç.")),{enableHighAccuracy:true,timeout:10000,maximumAge:30000});
+  }catch(e){ msg(T("Konum alınamadı.")); }
 }
 
 // ================= ROTA HESABI (RAPTOR) =================
@@ -964,7 +1072,7 @@ async function deepPlan(){
   const yieldUI=()=>new Promise(r=>setTimeout(r,0));
   const radii=(M.Aids&&M.Bids)?[[0,0]]:[[400,400],[400,2500],[2500,400],[900,2500],[2500,900]];
   let n=0; const total=radii.length*10+4;
-  const step=async()=>{ n++; if(n%3===0){ M.deepMsg=`Geniş arama… %${Math.min(99,Math.round(n/total*100))} · ${new Set(all.map(planKey)).size} seçenek`; renderPlans(); await yieldUI(); if(M.runId!==run) throw 0; } };
+  const step=async()=>{ n++; if(n%3===0){ M.deepMsg=T("Geniş arama… %{0} · {1} seçenek",Math.min(99,Math.round(n/total*100)),new Set(all.map(planKey)).size); renderPlans(); await yieldUI(); if(M.runId!==run) throw 0; } };
   try{
     for(const [ra,rb] of radii){
       const O=M.Aids?groupAccess(M.Aids):access(M.A,Math.min(ra,800),ra), Dn=M.Bids?groupAccess(M.Bids):access(M.B,Math.min(rb,800),rb);
@@ -988,7 +1096,7 @@ function computePlans(){
   saveRecent();
   if(!(history.state&&history.state.d)) try{ history.pushState({d:"plans"},""); }catch(e){}
   M.runId=(M.runId||0)+1; M.deep=null; M.deepMsg="";
-  document.getElementById("plans").innerHTML=`<div class="more">⏳ Rotalar hesaplanıyor…</div>`;
+  document.getElementById("plans").innerHTML=`<div class="more">⏳ ${T("Rotalar hesaplanıyor…")}</div>`;
   const run=M.runId;
   setTimeout(()=>{ if(run!==M.runId) return; computePlansNow(); },30);
 }
@@ -1020,21 +1128,21 @@ function legPath(x,from,to){
 // Bir seçeneği adım adım parçalara ayır
 function steps(o){
   const now=nowMin(), out=[];
-  if(o.walk){ out.push({k:"walk",from:M.A,to:M.B,m:o.m,dk:walkMin(o.m),t:now,txt:"Varış noktasına yürü"}); return out; }
+  if(o.walk){ out.push({k:"walk",from:M.A,to:M.B,m:o.m,dk:walkMin(o.m),t:now,txt:T("Varış noktasına yürü")}); return out; }
   const p=s=>STOPS[s].p;
   const leave=(o.mt||metrics(o)).leave;
-  out.push({k:"walk",from:o.w1.m?M.A:p(o.w1.sid),to:p(o.w1.sid),m:o.w1.m,dk:o.w1.w,t:leave,txt:`${STOPS[o.w1.sid].n} durağına yürü`});
+  out.push({k:"walk",from:o.w1.m?M.A:p(o.w1.sid),to:p(o.w1.sid),m:o.w1.m,dk:o.w1.w,t:leave,txt:T("{0} durağına yürü",STOPS[o.w1.sid].n)});
   o.legs.forEach((g,i)=>{
     const Ln=LINES[g.li], x=Ln.dir[g.di], off=x.o[g.to]-x.o[g.from];
     if(i>0){ const pg=o.legs[i-1], px=LINES[pg.li].dir[pg.di];
-      out.push({k:"walk",from:p(px.s[pg.to]),to:p(x.s[g.from]),m:g.tw,dk:g.tw?walkMin(g.tw):0,t:pg.board+(px.o[pg.to]-px.o[pg.from]),txt:`Aktarma: ${STOPS[x.s[g.from]].n} durağına yürü`}); }
+      out.push({k:"walk",from:p(px.s[pg.to]),to:p(x.s[g.from]),m:g.tw,dk:g.tw?walkMin(g.tw):0,t:pg.board+(px.o[pg.to]-px.o[pg.from]),txt:T("Aktarma: {0} durağına yürü",STOPS[x.s[g.from]].n)}); }
     const prevEnd=out.length?(out[out.length-1].t+(out[out.length-1].dk||0)):leave;
     out.push({k:"ride",Ln,x,g,t:g.board,end:g.board+off,dk:Math.round(off),first:i===0,bekle:Math.max(0,Math.round(g.board-prevEnd)),
       on:STOPS[x.s[g.from]].n, off:STOPS[x.s[g.to]].n, yon:x.h||STOPS[x.s[x.s.length-1]].n,
       ara:x.s.slice(g.from+1,g.to).map(s=>STOPS[s].n)});
   });
   const last=out[out.length-1];
-  out.push({k:"walk",from:p(o.w2.sid),to:o.w2.m?M.B:p(o.w2.sid),m:o.w2.m,dk:o.w2.w,t:last.end,txt:"Varış noktasına yürü"});
+  out.push({k:"walk",from:p(o.w2.sid),to:o.w2.m?M.B:p(o.w2.sid),m:o.w2.m,dk:o.w2.w,t:last.end,txt:T("Varış noktasına yürü")});
   return out;
 }
 const chain=(o,single,compact)=>{ let ri=0; const all=[o,...(single?[]:(o.alts||[]))];
@@ -1068,7 +1176,8 @@ function fareOf(o){
     else if(L.t==="dolmus"){ f=DM_FARE[L.b]; if(f===undefined){ f=145; ap=true; } }
     else {
       if(first===null||g.board-first>120){ first=g.board; k=0; } else k++;
-      if(L.t==="metrobus") f=FARE.metrobus;
+      if(L.id==="m11"){ f=FARE.marmaray; ap=true; } // M11 (TCDD) mesafe tarifeli: en yüksek, tahmini
+      else if(L.t==="metrobus") f=FARE.metrobus;
       else if(L.t==="marmaray") f=FARE.marmaray;
       else if(L.t==="vapur"){ f=FARE.vapur; ap=true; }
       else f=k===0?FARE.tam:FARE.akt[Math.min(k-1,FARE.akt.length-1)];
@@ -1080,14 +1189,14 @@ function fareOf(o){
   }
   return {legs,total:Math.round(total*100)/100,approx};
 }
-const tl=(v,ap)=>(ap?"≈":"")+v.toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})+" ₺";
+const tl=(v,ap)=>(ap?"≈":"")+v.toLocaleString(LANG==="en"?"en-US":"tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})+" ₺";
 function planCard(o,k,now){
   const mt=o.mt||metrics(o), first=o.legs?o.legs[0]:null;
-  const leaveTxt=mt.leave-now<=1?"Hemen çık":`Çıkış ${fmt(mt.leave)} · ${dk(mt.leave-now)} sonra`;
-  let sub=o.walk?`${o.m} m yürüyüş`:`${leaveTxt} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)}`;
+  const leaveTxt=mt.leave-now<=1?T("Hemen çık"):T("Çıkış {0} · {1} sonra",fmt(mt.leave),dk(mt.leave-now));
+  let sub=o.walk?T("{0} m yürüyüş",o.m):`${leaveTxt} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)}`;
   if(o.alts&&o.alts.length){ const lv=[...new Set(o.alts.map(p=>(p.mt||metrics(p)).leave).filter(t=>t>mt.leave+0.5).sort((x,y)=>x-y).map(fmt))].slice(0,2);
-    if(lv.length) sub+=` · sonra ${lv.join(", ")}`; }
-  const tg=(o.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
+    if(lv.length) sub+=` · ${T("sonra")} ${lv.join(", ")}`; }
+  const tg=(o.tags||[]).map(t=>`<span class="tag">${T(t)}</span>`).join("");
   const fr=fareOf(o);
   const meta=o.walk?"":` · 🚶 ${mt.walk>=1000?(mt.walk/1000).toFixed(1)+" km":mt.walk+" m"}`;
   return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o,false,true)}</div><div class="sub">${sub}${meta}</div></div>
@@ -1100,21 +1209,21 @@ function renderPlans(){
   if(!M.plans){ el.innerHTML=M.A&&M.B?"":homeHTML(); return; }
   const top=M.plans.slice(0,M.topCount), more=M.plans.slice(M.topCount);
   const dl=M.direct||[];
-  let html=dl.length?`<h3 class="sec" style="margin-top:4px">Aktarmasız giden hatlar</h3><div class="dchips">${dl.map((o,i)=>{const g=o.legs[0],Ln=LINES[g.li];
-      return `<button class="dchip" data-direct="${i}"><span class="cb" style="background:${lc(Ln)}">${bt(Ln)}</span><span>${inMin(g.board)==="Şimdi"?"şimdi":inMin(g.board)}<small>${fmt(g.board)} · ${dk(o.arr-now)}</small></span></button>`;}).join("")}</div>`:"";
-  html+=M.plans.length?`<h3 class="sec" style="margin-top:4px">Seçenekler</h3>`+top.map((o,k)=>planCard(o,k,now)).join("")
-    :`<div class="empty">Hızlı aramada yol bulunamadı. Aşağıdan geniş arama yapabilirsin.</div>`;
+  let html=dl.length?`<h3 class="sec" style="margin-top:4px">${T("Aktarmasız giden hatlar")}</h3><div class="dchips">${dl.map((o,i)=>{const g=o.legs[0],Ln=LINES[g.li];
+      return `<button class="dchip" data-direct="${i}"><span class="cb" style="background:${lc(Ln)}">${bt(Ln)}</span><span>${inMin(g.board)===T("Şimdi")?T("şimdi"):inMin(g.board)}<small>${fmt(g.board)} · ${dk(o.arr-now)}</small></span></button>`;}).join("")}</div>`:"";
+  html+=M.plans.length?`<h3 class="sec" style="margin-top:4px">${T("Seçenekler")}</h3>`+top.map((o,k)=>planCard(o,k,now)).join("")
+    :`<div class="empty">${T("Hızlı aramada yol bulunamadı. Aşağıdan geniş arama yapabilirsin.")}</div>`;
   if(M.deep==="done"){
-    html+=more.length?`<h3 class="sec">Diğer seçenekler (${more.length})</h3>`+more.map((o,i)=>planCard(o,M.topCount+i,now)).join("")
-      :`<div class="more">Geniş aramada başka seçenek çıkmadı.</div>`;
+    html+=more.length?`<h3 class="sec">${T("Diğer seçenekler ({0})",more.length)}</h3>`+more.map((o,i)=>planCard(o,M.topCount+i,now)).join("")
+      :`<div class="more">${T("Geniş aramada başka seçenek çıkmadı.")}</div>`;
   } else if(M.deep==="run"){
-    html+=`<div class="more">${esc(M.deepMsg||"Geniş arama…")}</div>`;
+    html+=`<div class="more">${esc(M.deepMsg||T("Geniş arama…"))}</div>`;
   } else if(M.searching){
-    html+=`<div class="more">🔄 Diğer ihtimaller aranıyor…</div>`;
+    html+=`<div class="more">🔄 ${T("Diğer ihtimaller aranıyor…")}</div>`;
   } else {
-    html+=`<button class="btn" style="width:100%;margin:4px 0 12px;background:var(--card);border:1px solid var(--line);color:var(--ink)" data-deep>🔎 Tüm seçenekleri göster (geniş arama)</button>`;
+    html+=`<button class="btn" style="width:100%;margin:4px 0 12px;background:var(--card);border:1px solid var(--line);color:var(--ink)" data-deep>🔎 ${T("Tüm seçenekleri göster (geniş arama)")}</button>`;
   }
-  el.innerHTML=html;
+  el.innerHTML=html+airportNote();
 }
 function showList(){
   if(NAV) stopNav(true);
@@ -1159,21 +1268,21 @@ function openPlan(k){
   try{ map.fitBounds(L.featureGroup(routeLayer.getLayers().concat([mkA,mkB].filter(Boolean))).getBounds().pad(.12)); }catch(e){}
   drawVehicles();
   const d=document.getElementById("detail"), FR=fareOf(o); let ri=-1;
-  d.innerHTML=`    <button class="navgo" data-navstart="${k}">▶ Canlı yol tarifini başlat</button>
-    <div class="dhead"><div><div class="chain">${chain(o,true)}</div><div class="sub">${esc(M.Aname)} → ${esc(M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>çıkış ${fmt((o.mt||metrics(o)).leave)} · varış ${fmt(o.arr)}</span>${o.legs?`<span class="fare">Toplam ${tl(FR.total,FR.approx)}</span>`:""}</div></div>
-    ${(o.alts&&o.alts.length)?`<h3 class="sec" style="margin-top:0">Aynı güzergâhta ${o.alts.length+1} seçenek</h3><div class="steps" style="margin-bottom:12px">${[o,...o.alts].map((p,j)=>{const m=p.mt||metrics(p);
-      return `<div class="dep altrow ${j===0?"on":""}" data-alt="${k}:${j}"><div class="t"><div class="chain">${chain(p,true)}</div><span>Çıkış ${fmt(m.leave)} · biniş ${fmt(p.legs[0].board)} · varış ${fmt(p.arr)} · 🚶 ${m.walk} m</span></div><div class="m">${dk(m.dur)}<small>${j===0?"gösteriliyor":"seç"}</small></div></div>`;}).join("")}</div>`:""}
-    <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname||"Başlangıç")}</b><span>${(o.mt||metrics(o)).leave-now<=1?"Hemen yola çık":"Yola çık: "+fmt((o.mt||metrics(o)).leave)+" ("+dk((o.mt||metrics(o)).leave-now)+" sonra)"}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
+  d.innerHTML=`    <button class="navgo" data-navstart="${k}">▶ ${T("Canlı yol tarifini başlat")}</button>
+    <div class="dhead"><div><div class="chain">${chain(o,true)}</div><div class="sub">${esc(M.Aname===ME?T(ME):M.Aname)} → ${esc(M.Bname===ME?T(ME):M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>${T("çıkış")} ${fmt((o.mt||metrics(o)).leave)} · ${T("varış")} ${fmt(o.arr)}</span>${o.legs?`<span class="fare">${T("Toplam")} ${tl(FR.total,FR.approx)}</span>`:""}</div></div>
+    ${(o.alts&&o.alts.length)?`<h3 class="sec" style="margin-top:0">${T("Aynı güzergâhta {0} seçenek",o.alts.length+1)}</h3><div class="steps" style="margin-bottom:12px">${[o,...o.alts].map((p,j)=>{const m=p.mt||metrics(p);
+      return `<div class="dep altrow ${j===0?"on":""}" data-alt="${k}:${j}"><div class="t"><div class="chain">${chain(p,true)}</div><span>${T("Çıkış")} ${fmt(m.leave)} · ${T("biniş")} ${fmt(p.legs[0].board)} · ${T("varış")} ${fmt(p.arr)} · 🚶 ${m.walk} m</span></div><div class="m">${dk(m.dur)}<small>${T(j===0?"gösteriliyor":"seç")}</small></div></div>`;}).join("")}</div>`:""}
+    <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname===ME?T(ME):M.Aname||T("Başlangıç"))}</b><span>${(o.mt||metrics(o)).leave-now<=1?T("Hemen yola çık"):T("Yola çık: {0} ({1} sonra)",fmt((o.mt||metrics(o)).leave),dk((o.mt||metrics(o)).leave-now))}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
       <div class="step s-walk"><div class="ic"><span>🚶</span></div><div class="tx"><b>${esc(s.txt)}</b><span data-wk="${s.from.join()+";"+s.to.join()}">${s.m} m · ~${dk(s.dk)}</span></div><div class="tm"></div></div>`:""):`
-      <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb${bt(s.Ln).length>5?" long":""}" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
-        <div class="tx"><b>Bin: ${esc(s.on)}</b><span>${esc(s.yon)} yönü · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${tl(FR.legs[ri].f,FR.legs[ri].ap)} · tam bilet</span>`:""}
-          <span class="wait">${s.first?(s.t-now<=1?"Şimdi kalkıyor":`${fmt(s.t)}'de kalkıyor (${dk(s.t-now)} sonra)`):(s.bekle?dk(s.bekle)+" bekleme":"Hemen aktarma")} · tarifeye göre</span>
-          ${s.ara.length?`<details><summary>${s.ara.length+1} durak · ~${dk(s.dk)}</summary><div class="ara">${s.ara.map(esc).join(" · ")}</div></details>`:`<span>1 durak · ~${dk(s.dk)}</span>`}
-          <b style="margin-top:6px">İn: ${esc(s.off)}</b></div>
+      <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb${bt(s.Ln).length>4?" long":""}" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
+        <div class="tx"><b>${T("Bin:")} ${esc(s.on)}</b><span>${yonT(esc(s.yon))} · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${tl(FR.legs[ri].f,FR.legs[ri].ap)} · ${T("tam bilet")}</span>`:""}
+          <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${T("tarifeye göre")}</span>
+          ${s.ara.length?`<details><summary>${s.ara.length+1} ${T("durak")} · ~${dk(s.dk)}</summary><div class="ara">${s.ara.map(esc).join(" · ")}</div></details>`:`<span>1 ${T("durak")} · ~${dk(s.dk)}</span>`}
+          <b style="margin-top:6px">${T("İn:")} ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
-      <div class="step"><div class="ic"><span>🏁</span></div><div class="tx"><b>${esc(M.Bname)}</b><span>Varış</span></div><div class="tm">${fmt(o.arr)}</div></div>
+      <div class="step"><div class="ic"><span>🏁</span></div><div class="tx"><b>${esc(M.Bname===ME?T(ME):M.Bname)}</b><span>${T("Varış")}</span></div><div class="tm">${fmt(o.arr)}</div></div>
     </div>
-    ${o.legs?`<div class="faresum"><b>Toplam ücret: ${tl(FR.total,FR.approx)}</b><span>Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs ve Marmaray'da en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.${FR.approx?" ≈ işaretliler (minibüs, dolmuş, vapur) en yüksek tahmini ücrettir.":""}</span></div>`:""}`;
+    ${o.legs?`<div class="faresum"><b>${T("Toplam ücret:")} ${tl(FR.total,FR.approx)}</b><span>${T("Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs, Marmaray ve M11'de en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.")}${FR.approx?" "+T("≈ işaretliler (minibüs, dolmuş, vapur, M11) en yüksek tahmini ücrettir."):""}</span></div>`:""}`;
   d.hidden=false; window.scrollTo(0,0);
 }
 
@@ -1186,7 +1295,7 @@ function navPhases(o){
   const ss=steps(o), ph=[];
   ss.forEach((s,i)=>{
     if(s.k==="walk"){ const last=i===ss.length-1;
-      if(last) ph.push({k:"walk",from:s.from,to:s.to,txt:"Varış noktasına yürü",last:true});
+      if(last) ph.push({k:"walk",from:s.from,to:s.to,txt:T("Varış noktasına yürü"),last:true});
       else if(s.m>25) ph.push({k:"walk",from:s.from,to:s.to,txt:s.txt});
       return; }
     const pts=s.x.s.slice(s.g.from,s.g.to+1).map(id=>({id,n:STOPS[id].n,p:STOPS[id].p,o:s.x.o[s.g.from+0]}));
@@ -1197,19 +1306,19 @@ function navPhases(o){
   return ph;
 }
 const navEl=()=>document.getElementById("nav");
-function say(t){ if(!NAV||!NAV.sound) return; try{ const u=new SpeechSynthesisUtterance(t); u.lang="tr-TR"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){} }
+function say(t){ if(!NAV||!NAV.sound) return; try{ const u=new SpeechSynthesisUtterance(t); u.lang=LANG==="en"?"en-US":"tr-TR"; speechSynthesis.cancel(); speechSynthesis.speak(u);}catch(e){} }
 function buzz(){ try{ navigator.vibrate&&navigator.vibrate([250,120,250]); }catch(e){} }
 async function keepAwake(){ try{ if(NAV&&"wakeLock" in navigator&&document.visibilityState==="visible") NAV.lock=await navigator.wakeLock.request("screen"); }catch(e){} }
 document.addEventListener("visibilitychange",()=>{ if(NAV&&document.visibilityState==="visible"){ keepAwake(); navTick(); } });
 function startNav(k){
   const o=M.plans[k]; if(!o) return;
-  NAV={k,o,ph:o.walk?[{k:"walk",from:M.A,to:M.B,txt:"Varış noktasına yürü",last:true},{k:"done"}]:navPhases(o),i:0,ci:0,pos:null,acc:null,fix:0,follow:true,sound:true,said:{},boardAt:null};
+  NAV={k,o,ph:o.walk?[{k:"walk",from:M.A,to:M.B,txt:T("Varış noktasına yürü"),last:true},{k:"done"}]:navPhases(o),i:0,ci:0,pos:null,acc:null,fix:0,follow:true,sound:true,said:{},boardAt:null};
   mv.classList.add("nav"); navEl().hidden=false; setTimeout(()=>map.invalidateSize(),0);
   keepAwake();
   if(navigator.geolocation){ try{ NAV.watch=navigator.geolocation.watchPosition(p=>{ if(!NAV) return;
       NAV.pos=[p.coords.latitude,p.coords.longitude]; NAV.acc=p.coords.accuracy; NAV.fix=Date.now(); myLoc=NAV.pos; navTick(); },
-    e=>{ if(NAV){ NAV.gpsErr=e.code===1?"Konum izni yok":"Konum alınamıyor"; navTick(); } },{enableHighAccuracy:true,maximumAge:5000,timeout:20000}); }catch(e){} }
-  else NAV.gpsErr="Bu cihazda konum yok";
+    e=>{ if(NAV){ NAV.gpsErr=T(e.code===1?"Konum izni yok":"Konum alınamıyor"); navTick(); } },{enableHighAccuracy:true,maximumAge:5000,timeout:20000}); }catch(e){} }
+  else NAV.gpsErr=T("Bu cihazda konum yok");
   NAV.timer=setInterval(navTick,10000);
   map.on("dragstart",navDrag);
   navEnter(); navTick();
@@ -1226,10 +1335,10 @@ function stopNav(silent){
 // Yeni adıma geçince sesli/titreşimli bildir
 function navEnter(){
   const P=NAV.ph[NAV.i]; NAV.ci=0; NAV.said={}; NAV.follow=true;
-  if(P.k==="walk") say(P.last?"Varış noktasına yürü":P.txt.replace("Aktarma: ",""));
-  else if(P.k==="wait") say(`${nm(P.s.Ln)} için ${P.s.on} durağında bekle`);
-  else if(P.k==="ride"){ NAV.boardAt=nowMin(); say(`${P.pts.length-1} durak sonra, ${P.s.off} durağında in`); }
-  else if(P.k==="done"){ say("Vardın"); buzz(); }
+  if(P.k==="walk") say(P.last?T("Varış noktasına yürü"):P.txt.replace(T("Aktarma: "),"").replace("Aktarma: ",""));
+  else if(P.k==="wait") say(T("{0} için {1} durağında bekle",nm(P.s.Ln),P.s.on));
+  else if(P.k==="ride"){ NAV.boardAt=nowMin(); say(T("{0} durak sonra, {1} durağında in",P.pts.length-1,P.s.off)); }
+  else if(P.k==="done"){ say(T("Vardın")); buzz(); }
 }
 function navNext(d){ const n=NAV.i+d; if(n<0||n>=NAV.ph.length) return; NAV.i=n; navEnter(); navTick(); }
 // Başlangıç "Konumum" değilse (haritadan seçilen nokta) ve sen rotanın uzağındaysan GPS kullanılmaz:
@@ -1239,7 +1348,7 @@ function navOnRoute(){
   if(!NAV.pos) return false;
   if(M.Aname==="📍 Konumum") return NAV.onRoute=true;
   const pts=[M.A,M.B]; NAV.ph.forEach(q=>{ if(q.k==="walk"){ if(q.from) pts.push(q.from); pts.push(q.to); } else if(q.pts) q.pts.forEach(z=>pts.push(z.p)); });
-  if(pts.some(q=>q&&hav(NAV.pos,q)<500)){ NAV.onRoute=true; say("Konumun bulundu, takip başladı"); }
+  if(pts.some(q=>q&&hav(NAV.pos,q)<500)){ NAV.onRoute=true; say(T("Konumun bulundu, takip başladı")); }
   return NAV.onRoute;
 }
 const gpsOk=()=>NAV.pos&&Date.now()-NAV.fix<45000&&(NAV.acc||0)<150&&navOnRoute();
@@ -1265,8 +1374,8 @@ function navTick(){
   if(P.k==="ride"&&!gpsOk()&&NAV.boardAt!=null){ // konum yok (yer altı): tarifeye göre tahmin
     const el=now-NAV.boardAt; let j=0; while(j+1<P.pts.length&&P.pts[j+1].o<=el) j++; NAV.ci=Math.max(NAV.ci,Math.min(j,P.pts.length-2)); }
   if(P.k==="ride"){ const rem=P.pts.length-1-NAV.ci;
-    if(rem<=1&&!NAV.said.r1){ NAV.said.r1=1; buzz(); say(`Sonraki durakta in: ${P.s.off}`); }
-    else if(rem===2&&!NAV.said.r2&&P.pts.length>3){ NAV.said.r2=1; say(`İki durak sonra ineceksin`); } }
+    if(rem<=1&&!NAV.said.r1){ NAV.said.r1=1; buzz(); say(T("Sonraki durakta in: {0}",P.s.off)); }
+    else if(rem===2&&!NAV.said.r2&&P.pts.length>3){ NAV.said.r2=1; say(T("İki durak sonra ineceksin")); } }
   navCamera();
   navRender();
 }
@@ -1300,40 +1409,40 @@ function navRender(){
     ic="🚶"; t=P.txt;
     if(pos){ const d=hav(pos,P.to); sub=`${Math.round(d)} m · ~${dk(walkMin(d))}`;
       if(nextRide&&NAV.ph[NAV.i+1]===nextRide){ const s=nextRide.s, ar=now+walkMin(d), nx=nextAt(s.x,s.g.from,ar,2);
-        warn=nx.length?`${esc(nm(s.Ln))} sonraki kalkış ${nx.map(fmt).join(", ")}${nx[0]-ar<=1?" · acele et":""}`:"";
-        if(NAV.i===0&&ar>s.t) warn=`<span class="late">Planlanan araca (${fmt(s.t)}) yetişemeyebilirsin.</span> `+warn; } }
-    else if(P.from){ const d=hav(P.from,P.to); sub=`${Math.round(d)} m · ~${dk(walkMin(d))}${far?" · konumun rotadan uzakta":NAV.gpsErr?" · "+NAV.gpsErr:""}`; }
-    else sub=NAV.gpsErr||"Konum bekleniyor…";
-    if(far) warn=(warn?warn+"<br>":"")+"Seçtiğin başlangıçtan tarif ediliyor. Adımları <b>Vardım / Bindim / İndim</b> ile ilerlet; rotaya yaklaşınca konumun kendiliğinden takip edilir.";
-    btn=`<button data-navnx="1">Vardım ›</button>`;
+        warn=nx.length?`${esc(nm(s.Ln))} ${T("sonraki kalkış")} ${nx.map(fmt).join(", ")}${nx[0]-ar<=1?" · "+T("acele et"):""}`:"";
+        if(NAV.i===0&&ar>s.t) warn=`<span class="late">${T("Planlanan araca ({0}) yetişemeyebilirsin.",fmt(s.t))}</span> `+warn; } }
+    else if(P.from){ const d=hav(P.from,P.to); sub=`${Math.round(d)} m · ~${dk(walkMin(d))}${far?" · "+T("konumun rotadan uzakta"):NAV.gpsErr?" · "+NAV.gpsErr:""}`; }
+    else sub=NAV.gpsErr||T("Konum bekleniyor…");
+    if(far) warn=(warn?warn+"<br>":"")+T("Seçtiğin başlangıçtan tarif ediliyor. Adımları <b>Vardım / Bindim / İndim</b> ile ilerlet; rotaya yaklaşınca konumun kendiliğinden takip edilir.");
+    btn=`<button data-navnx="1">${T("Vardım")} ›</button>`;
   } else if(P.k==="wait"){
     const s=P.s, nx=nextAt(s.x,s.g.from,now-0.5,3);
-    ic=`<span class="cb" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span>`; t=`${esc(s.on)} durağında bekle`;
-    sub=`${esc(s.yon)} yönü · ${esc(s.Ln.n)}`;
-    warn=nx.length?`Sonraki araç: ${nx.map(x=>`${fmt(x)} (${Math.max(0,Math.round(x-now))} dk)`).join(" · ")}`:"Bugün başka sefer görünmüyor";
-    btn=`<button class="pri" data-navnx="1">Bindim ›</button>`;
+    ic=`<span class="cb" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span>`; t=T("{0} durağında bekle",esc(s.on));
+    sub=`${yonT(esc(s.yon))} · ${esc(s.Ln.n)}`;
+    warn=nx.length?`${T("Sonraki araç:")} ${nx.map(x=>`${fmt(x)} (${Math.max(0,Math.round(x-now))}${DK()})`).join(" · ")}`:T("Bugün başka sefer görünmüyor");
+    btn=`<button class="pri" data-navnx="1">${T("Bindim")} ›</button>`;
   } else if(P.k==="ride"){
     const s=P.s, rem=P.pts.length-1-NAV.ci, nxt=P.pts[Math.min(NAV.ci+1,P.pts.length-1)];
     ic=`<span class="cb" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span>`;
-    t=rem<=0?`İn: ${esc(s.off)}`:`${rem} durak sonra in: ${esc(s.off)}`;
+    t=rem<=0?`${T("İn:")} ${esc(s.off)}`:T("{0} durak sonra in: {1}",rem,esc(s.off));
     const eta=(NAV.boardAt!=null?NAV.boardAt:s.t)+P.pts[P.pts.length-1].o;
-    sub=`Sonraki durak: ${esc(nxt.n)} · tahmini iniş ${fmt(eta)}${gpsOk()?"":" · konum yok, tarifeye göre"}`;
-    if(rem<=1) alert=rem<=0?`🔔 Şimdi in: ${esc(s.off)}`:`🔔 Sonraki durakta inmeye hazırlan`;
-    btn=`<button class="pri" data-navnx="1">İndim ›</button>`;
-  } else { ic="🏁"; t=`Vardın: ${esc(M.Bname||"Varış")}`; sub="İyi yolculuklar!"; }
+    sub=`${T("Sonraki durak:")} ${esc(nxt.n)} · ${T("tahmini iniş")} ${fmt(eta)}${gpsOk()?"":" · "+T("konum yok, tarifeye göre")}`;
+    if(rem<=1) alert=rem<=0?`🔔 ${T("Şimdi in:")} ${esc(s.off)}`:`🔔 ${T("Sonraki durakta inmeye hazırlan")}`;
+    btn=`<button class="pri" data-navnx="1">${T("İndim")} ›</button>`;
+  } else { ic="🏁"; t=`${T("Vardın:")} ${esc(M.Bname===ME?T(ME):M.Bname||T("Varış"))}`; sub=T("İyi yolculuklar!"); }
   // sonraki adım özeti
   const N=NAV.ph[NAV.i+1]; let nx="";
-  if(N&&N.k==="walk") nx=`Sonra: 🚶 ${esc(N.txt)}`;
-  else if(N&&N.k==="wait") nx=`Sonra: ${esc(nm(N.s.Ln))} — ${esc(N.s.on)} durağından bin`;
-  else if(N&&N.k==="ride") nx=`Sonra: ${P.pts.length-1} durak git, ${esc(N.s.off)}'da in`;
-  else if(N&&N.k==="done") nx=`Sonra: 🏁 ${esc(M.Bname||"Varış")}`;
+  if(N&&N.k==="walk") nx=`${T("Sonra:")} 🚶 ${esc(N.txt)}`;
+  else if(N&&N.k==="wait") nx=`${T("Sonra:")} ${T("{0} — {1} durağından bin",esc(nm(N.s.Ln)),esc(N.s.on))}`;
+  else if(N&&N.k==="ride") nx=`${T("Sonra:")} ${T("{0} durak git, {1}'da in",P.pts.length-1,esc(N.s.off))}`;
+  else if(N&&N.k==="done") nx=`${T("Sonra:")} 🏁 ${esc(M.Bname===ME?T(ME):M.Bname||T("Varış"))}`;
   el.innerHTML=`<div class="nt"><div class="ni">${ic}</div><div style="flex:1;min-width:0"><b>${t}</b><div class="ns">${sub}</div>${warn?`<div class="nw">${warn}</div>`:""}</div></div>
     ${alert?`<div class="alert">${alert}</div>`:""}${nx?`<div class="nx">${nx}</div>`:""}
-    <div class="nb">${NAV.i>0?`<button data-navnx="-1">‹ Geri</button>`:""}${btn}
-      ${NAV.follow?"":`<button data-navctr>◎ Ortala</button>`}
+    <div class="nb">${NAV.i>0?`<button data-navnx="-1">${T("‹ Geri")}</button>`:""}${btn}
+      ${NAV.follow?"":`<button data-navctr>◎ ${T("Ortala")}</button>`}
       <button data-navsnd>${NAV.sound?"🔊":"🔇"}</button>
-      ${live&&P.k!=="done"?`<button data-navre>↻ Buradan yeniden</button>`:""}
-      <button data-navstop>✕ Bitir</button></div>`;
+      ${live&&P.k!=="done"?`<button data-navre>↻ ${T("Buradan yeniden")}</button>`:""}
+      <button data-navstop>✕ ${T("Bitir")}</button></div>`;
 }
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-navstart],[data-navnx],[data-navctr],[data-navsnd],[data-navre],[data-navstop]"); if(!b) return;
@@ -1371,14 +1480,14 @@ function coordFrom(text){
   if((m=t.match(/^\s*(-?\d{2}\.\d+)\s*[, ]\s*(-?\d{2}\.\d+)\s*$/))) return ok(m[1],m[2]); // düz koordinat
   return null;
 }
-const placeName=text=>{ const m=decodeURIComponent(text).match(/\/place\/([^/@]+)/); return m?m[1].replace(/\+/g," "):"Linkteki konum"; };
+const placeName=text=>{ const m=decodeURIComponent(text).match(/\/place\/([^/@]+)/); return m?m[1].replace(/\+/g," "):T("Linkteki konum"); };
 async function fromLink(w,raw){
   let ll=coordFrom(raw), name=placeName(raw);
   if(!ll&&/^https?:\/\//.test(raw)){
-    msg("Link açılıyor…");
+    msg(T("Link açılıyor…"));
     try{ const j=await (await fetch("/api/resolve?u="+encodeURIComponent(raw))).json(); if(j.ok){ ll=coordFrom(j.url); name=placeName(j.url); } }catch(e){}
   }
-  if(!ll) return msg("Bu linkte konum bulunamadı. Haritada dokunarak seçebilirsin.");
+  if(!ll) return msg(T("Bu linkte konum bulunamadı. Haritada dokunarak seçebilirsin."));
   setEnd(w,ll,name);
 }
 function showSugg(which){
@@ -1390,21 +1499,21 @@ function showSugg(which){
     .filter(n=>{const k=norm(n);if(seenN.has(k))return false;seenN.add(k);return true;}).slice(0,5):[];
   sugg.style.top=(inp.offsetTop+inp.offsetHeight+6)+"px";
   const isLink=/^https?:\/\//.test(raw)||coordFrom(raw);
-  if(isLink){ sugg.style.top=(inp.offsetTop+inp.offsetHeight+6)+"px"; sugg.innerHTML=`<button data-sug-link>🔗 Linkteki/koordinattaki konumu kullan</button>`; sugg.hidden=false; return; }
-  sugg.innerHTML=`<button data-sug-loc>📍 Konumum</button><button data-sug-map>🗺️ Haritada seç</button>`+
-    (r.length?`<div class="sh">Duraklar</div>`:"")+
+  if(isLink){ sugg.style.top=(inp.offsetTop+inp.offsetHeight+6)+"px"; sugg.innerHTML=`<button data-sug-link>🔗 ${T("Linkteki/koordinattaki konumu kullan")}</button>`; sugg.hidden=false; return; }
+  sugg.innerHTML=`<button data-sug-loc>📍 ${T("Konumum")}</button><button data-sug-map>🗺️ ${T("Haritada seç")}</button>`+
+    (r.length?`<div class="sh">${T("Duraklar")}</div>`:"")+
     r.map(n=>`<button data-sug="${esc(n)}">🚏 ${esc(n)} <small>${[...new Set(group(n).flatMap(id=>(IDX[id]||[]).map(([li])=>LINES[li].b)))].slice(0,5).map(esc).join(", ")}</small></button>`).join("")+
-    (raw.length>=3?`<div class="sh">Yerler ve adresler</div><div id="places"><button disabled><small>Aranıyor…</small></button></div>`:"");
+    (raw.length>=3?`<div class="sh">${T("Yerler ve adresler")}</div><div id="places"><button disabled><small>${T("Aranıyor…")}</small></button></div>`:"");
   sugg.hidden=false;
   clearTimeout(placeTimer);
-  if(raw.length>=3&&raw!=="Konumum"){
+  if(raw.length>=3&&raw!=="Konumum"&&raw!==T("Konumum")){
     const seq=++placeSeq;
     placeTimer=setTimeout(async()=>{
       try{
         const ps=await fetchPlaces(raw); if(seq!==placeSeq) return;
         const el=document.getElementById("places"); if(!el) return;
-        el.innerHTML=ps.map(x=>`<button data-place="${x.ll}" data-pname="${esc(x.name)}">📌 ${esc(x.name)} <small>${esc(x.sub)}</small></button>`).join("")||`<button disabled><small>Adres bulunamadı</small></button>`;
-      }catch(e){ const el=document.getElementById("places"); if(el) el.innerHTML=`<button disabled><small>Adres araması şu an çalışmıyor</small></button>`; }
+        el.innerHTML=ps.map(x=>`<button data-place="${x.ll}" data-pname="${esc(x.name)}">📌 ${esc(x.name)} <small>${esc(x.sub)}</small></button>`).join("")||`<button disabled><small>${T("Adres bulunamadı")}</small></button>`;
+      }catch(e){ const el=document.getElementById("places"); if(el) el.innerHTML=`<button disabled><small>${T("Adres araması şu an çalışmıyor")}</small></button>`; }
     },400);
   }
 }
@@ -1418,7 +1527,7 @@ sugg.addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return; const w=M.field;
   if(b.hasAttribute("data-sug-loc")){ sugg.hidden=true; if(myLoc) return setEnd(w,myLoc,"📍 Konumum"); return askLocation(()=>{ if(w==="to") setEnd("to",myLoc,"📍 Konumum"); }); }
   if(b.hasAttribute("data-sug-link")){ sugg.hidden=true; const inp=w==="from"?fromQ:toQ; inp.blur(); return fromLink(w,inp.value.trim()); }
-  if(b.hasAttribute("data-sug-map")){ sugg.hidden=true; (w==="from"?fromQ:toQ).blur(); return msg(w==="from"?"Başlangıç için haritada bir yere dokun.":"Gideceğin yer için haritada bir yere dokun."); }
+  if(b.hasAttribute("data-sug-map")){ sugg.hidden=true; (w==="from"?fromQ:toQ).blur(); return msg(T(w==="from"?"Başlangıç için haritada bir yere dokun.":"Gideceğin yer için haritada bir yere dokun.")); }
   if(b.dataset.sug){ const n=b.dataset.sug; setEnd(w,STOPS[BYNAME[n][0]].p,n,group(n)); }
   if(b.dataset.place){ setEnd(w,b.dataset.place.split(",").map(Number),b.dataset.pname); }
 });
@@ -1470,7 +1579,7 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   hist=[];go({tab:b.dataset.tab,line:null,stop:null,q:""});});
 setInterval(()=>{ if(!app.hidden&&(!document.activeElement||document.activeElement.tagName!=="INPUT")) render(); },30000);
 
-loadData().then(render).catch(e=>{app.innerHTML=`<div class="empty">Veri yüklenemedi: ${esc(e.message)}</div>`;});
+loadData().then(render).catch(e=>{app.innerHTML=`<div class="empty">${T("Veri yüklenemedi:")} ${esc(e.message)}</div>`;});
 </script>
 </body>
 </html>
