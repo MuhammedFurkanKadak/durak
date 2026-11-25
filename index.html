@@ -350,7 +350,7 @@ const EN={
 "Havalimanı":"Airport","İstanbul Havalimanı":"Istanbul Airport","Sabiha Gökçen":"Sabiha Gökçen",
 "Havalimanındasın: şehirde nereye gideceğini yaz.":"You're at the airport: type where you're going in the city.",
 "Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.":"Airport coaches (IST: Havaist, SAW: Havabüs) have their own fares and aren't shown in these routes.",
-"Havaist saatleri":"Havaist timetable","Canlı":"Live","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
+"Havaist saatleri":"Havaist timetable","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
 };
 function T(s,...a){ let r=(LANG==="en"&&EN[s]!==undefined)?EN[s]:s; a.forEach((v,i)=>{ r=r.split("{"+i+"}").join(v); }); return r; }
 const yonT=y=>LANG==="en"?"to "+y:y+" yönü";
@@ -422,7 +422,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611260000";
+const APP_VERSION="202611260030";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -467,6 +467,9 @@ const nowMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()+d.get
 const DK=()=>LANG==="en"?" min":" dk", SA=()=>LANG==="en"?" h":" sa";
 const dk=m=>{m=Math.max(0,Math.round(m)); if(m<60) return m+DK(); const h=Math.floor(m/60), r=m%60; return h+SA()+(r?" "+r+DK():"");};
 const dkBig=m=>{m=Math.max(0,Math.round(m)); if(m<60) return `${m}<small>${DK()}</small>`; const h=Math.floor(m/60), r=m%60; return `${h}<small>${SA()}</small>`+(r?` ${r}<small>${DK()}</small>`:"");};
+const dayEnd=now=>now-(now%1440)+1440;               // bu gecenin 24:00'ı (dakika)
+const isTomorrow=(t,now)=>t>=dayEnd(now)+240; // ertesi sabah (04:00 sonrası) seferi; gece yarısı-04:00 arası "bu gece" sayılır
+const whenTxt=(t,now)=>isTomorrow(t,now)?T("yarın {0}",fmt(t)):fmt(t);
 const inMin=t=>{const x=Math.round(t-nowMin());return x<=0?T("Şimdi"):dk(x)};
 const hav=(a,b)=>{const r=Math.PI/180,dLa=(b[0]-a[0])*r,dLo=(b[1]-a[1])*r;const s=Math.sin(dLa/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLo/2)**2;return 2*6371000*Math.asin(Math.sqrt(s));};
 const walkMin=m=>Math.max(1,Math.round(m*1.3/80));
@@ -977,7 +980,9 @@ function rank(all,now,limit){
   const sameHop=o=>!o.walk&&o.legs.some((l,i)=>{ if(i===0) return false; const p=o.legs[i-1];
     // önceki araç orada son durağına varıyorsa (sefer bitiyor) aynı hatta yeniden binmek gerçek bir aktarmadır
     return LINES[l.li].b===LINES[p.li].b&&LINES[l.li].t!=="minibus"&&LINES[l.li].t!=="dolmus"&&p.to<LINES[p.li].dir[p.di].s.length-1; });
-  const cand=Object.values(byKey).filter(o=>!sameHop(o)&&o.mt.leave>=now-1&&o.mt.leave-now<=480&&o.mt.walk<6000)
+  // Şu an (8 saat içinde) toplu taşıma yoksa ya da gece geç saatse: ertesi sabah 09:00'a kadarki seferler de gösterilsin
+  const lateCap=Math.max(480,dayEnd(now)+540-now);
+  const cand=Object.values(byKey).filter(o=>!sameHop(o)&&o.mt.leave>=now-1&&o.mt.leave-now<=lateCap&&o.mt.walk<6000)
     .sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
   const kept=[], other=[];
   for(const o of cand){
@@ -1031,7 +1036,7 @@ function directLines(O,Dn,now){
     const ds=dest[li*1000+di]; if(!ds) return;
     const x=LINES[li].dir[di], w1=walkMin(d);
     ds.forEach(e=>{ if(e.pos<=pos) return;
-      const b=nextAt(x,pos,now+w1)[0]; if(b===undefined||b-now>120) return;
+      const b=nextAt(x,pos,now+w1)[0]; if(b===undefined||(b-now>120&&b>dayEnd(now)+540)) return;
       const arr=b+(x.o[e.pos]-x.o[pos])+walkMin(e.d);
       const k=LINES[li].b+"|"+LINES[li].n;
       if(!best[k]||arr<best[k].arr) best[k]={legs:[{li,di,from:pos,to:e.pos,board:b,tw:0}],w1:{sid:id,m:Math.round(d),w:w1},w2:{sid:e.id,m:Math.round(e.d),w:walkMin(e.d)},arr};
@@ -1072,7 +1077,7 @@ function planStages(A,B,Aids,Bids){
     // Gece ya da şu an makul sefer yoksa: sonraki çıkışlar ve sabah ilk seferleri (05:00–06:30), az/orta yürüme modlarıyla
     ()=>{ const hh=now%1440, soon=all.some(o=>!o.walk&&o.legs[0].board-now<=60), starts=[];
       if(hh<300||!soon){ starts.push(now+30,now+60,now+120); if(hh<300) [300,330,360,390].forEach(t=>starts.push(now-hh+t)); else if(hh>=1200) [300,330,360,390].forEach(t=>starts.push(now-hh+1440+t)); }
-      for(const t0 of starts) for(const [ma,mb] of [["orta","orta"],["az","orta"],["orta","az"]]){
+      for(const t0 of starts) for(const [ma,mb] of [["orta","orta"],["az","orta"],["orta","az"],["az","az"]]){
         const O=get("A",ma), Dn=get("B",mb); if(!O.length||!Dn.length) continue;
         let cur=raptor(O,Dn,t0,null,{hor:120}).filter(o=>o.legs[0].board>=t0); all.push(...cur);
         // farklı besleyici hatlar (aynı ana trene başka otobüs/minibüsle yaklaşma)
@@ -1267,7 +1272,7 @@ function fareOf(o){
 const tl=(v,ap)=>(ap?"≈":"")+v.toLocaleString(LANG==="en"?"en-US":"tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})+" ₺";
 function planCard(o,k,now){
   const mt=o.mt||metrics(o), first=o.legs?o.legs[0]:null;
-  const leaveTxt=mt.leave-now<=1?T("Hemen çık"):T("Çıkış {0} · {1} sonra",fmt(mt.leave),dk(mt.leave-now));
+  const leaveTxt=mt.leave-now<=1?T("Hemen çık"):isTomorrow(mt.leave,now)?`🌙 ${T("Yarın {0}'de çık",fmt(mt.leave))}`:T("Çıkış {0} · {1} sonra",fmt(mt.leave),dk(mt.leave-now));
   let sub=o.walk?T("{0} m yürüyüş",o.m):`${leaveTxt} · ${esc(STOPS[LINES[first.li].dir[first.di].s[first.from]].n)}`;
   if(o.alts&&o.alts.length){ const lv=[...new Set(o.alts.map(p=>(p.mt||metrics(p)).leave).filter(t=>t>mt.leave+0.5).sort((x,y)=>x-y).map(fmt))].slice(0,2);
     if(lv.length) sub+=` · ${T("sonra")} ${lv.join(", ")}`; }
@@ -1275,7 +1280,7 @@ function planCard(o,k,now){
   const fr=fareOf(o);
   const meta=o.walk?"":` · 🚶 ${mt.walk>=1000?(mt.walk/1000).toFixed(1)+" km":mt.walk+" m"}`;
   return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o,false,true)}</div><div class="sub">${sub}${meta}</div></div>
-    <div class="dur">${dkBig(mt.dur)}<span>${fmt(mt.leave)}–${fmt(o.arr)}</span>${o.walk?"":`<span class="fare">${tl(fr.total,fr.approx)}</span>`}</div><span class="chev">›</span></div>`;
+    <div class="dur">${dkBig(mt.dur)}<span>${isTomorrow(mt.leave,now)?T("yarın")+" ":""}${fmt(mt.leave)}–${fmt(o.arr)}</span>${o.walk?"":`<span class="fare">${tl(fr.total,fr.approx)}</span>`}</div><span class="chev">›</span></div>`;
 }
 // Kısa, tıklanabilir seçenek kartları
 // Kısa, tıklanabilir seçenek kartları
@@ -1285,7 +1290,7 @@ function renderPlans(){
   const top=M.plans.slice(0,M.topCount), more=M.plans.slice(M.topCount);
   const dl=M.direct||[];
   let html=dl.length?`<h3 class="sec" style="margin-top:4px">${T("Aktarmasız giden hatlar")}</h3><div class="dchips">${dl.map((o,i)=>{const g=o.legs[0],Ln=LINES[g.li];
-      return `<button class="dchip" data-direct="${i}"><span class="cb" style="background:${lc(Ln)}">${bt(Ln)}</span><span>${inMin(g.board)===T("Şimdi")?T("şimdi"):inMin(g.board)}<small>${fmt(g.board)} · ${dk(o.arr-now)}</small></span></button>`;}).join("")}</div>`:"";
+      return `<button class="dchip" data-direct="${i}"><span class="cb" style="background:${lc(Ln)}">${bt(Ln)}</span><span>${isTomorrow(g.board,now)?T("yarın"):inMin(g.board)===T("Şimdi")?T("şimdi"):inMin(g.board)}<small>${fmt(g.board)}${isTomorrow(g.board,now)?"":" · "+dk(o.arr-now)}</small></span></button>`;}).join("")}</div>`:"";
   html+=M.plans.length?`<h3 class="sec" style="margin-top:4px">${T("Seçenekler")}</h3>`+top.map((o,k)=>planCard(o,k,now)).join("")
     :`<div class="empty">${T("Hızlı aramada yol bulunamadı. Aşağıdan geniş arama yapabilirsin.")}</div>`;
   if(M.deep==="done"){
@@ -1347,12 +1352,12 @@ function openPlan(k){
     <div class="dhead"><div><div class="chain">${chain(o,true)}</div><div class="sub">${esc(M.Aname===ME?T(ME):M.Aname)} → ${esc(M.Bname===ME?T(ME):M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>${T("çıkış")} ${fmt((o.mt||metrics(o)).leave)} · ${T("varış")} ${fmt(o.arr)}</span>${o.legs?`<span class="fare">${T("Toplam")} ${tl(FR.total,FR.approx)}</span>`:""}</div></div>
     ${(o.alts&&o.alts.length)?`<h3 class="sec" style="margin-top:0">${T("Aynı güzergâhta {0} seçenek",o.alts.length+1)}</h3><div class="steps" style="margin-bottom:12px">${[o,...o.alts].map((p,j)=>{const m=p.mt||metrics(p);
       return `<div class="dep altrow ${j===0?"on":""}" data-alt="${k}:${j}"><div class="t"><div class="chain">${chain(p,true)}</div><span>${T("Çıkış")} ${fmt(m.leave)} · ${T("biniş")} ${fmt(p.legs[0].board)} · ${T("varış")} ${fmt(p.arr)} · 🚶 ${m.walk} m</span></div><div class="m">${dk(m.dur)}<small>${T(j===0?"gösteriliyor":"seç")}</small></div></div>`;}).join("")}</div>`:""}
-    <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname===ME?T(ME):M.Aname||T("Başlangıç"))}</b><span>${(o.mt||metrics(o)).leave-now<=1?T("Hemen yola çık"):T("Yola çık: {0} ({1} sonra)",fmt((o.mt||metrics(o)).leave),dk((o.mt||metrics(o)).leave-now))}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
+    <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname===ME?T(ME):M.Aname||T("Başlangıç"))}</b><span>${(o.mt||metrics(o)).leave-now<=1?T("Hemen yola çık"):(isTomorrow((o.mt||metrics(o)).leave,now)?T("Bu gece sefer yok. Yarın {0}'de yola çık",fmt((o.mt||metrics(o)).leave)):T("Yola çık: {0} ({1} sonra)",fmt((o.mt||metrics(o)).leave),dk((o.mt||metrics(o)).leave-now)))}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
       <div class="step s-walk"><div class="ic"><span>🚶</span></div><div class="tx"><b>${esc(s.txt)}</b><span data-wk="${s.from.join()+";"+s.to.join()}">${s.m} m · ~${dk(s.dk)}</span></div><div class="tm"></div></div>`:""):`
       <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb${bt(s.Ln).length>4?" long":""}" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
         <div class="tx"><b>${T("Bin:")} ${esc(s.on)}</b><span>${yonT(esc(s.yon))} · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${FR.legs[ri].f===0?T("ücretsiz aktarma"):tl(FR.legs[ri].f,FR.legs[ri].ap)+" · "+T("tam bilet")}</span>`:""}
           <span class="lv" data-lsid="${s.x.s[s.g.from]}" data-lb="${esc(s.Ln.b)}" data-lplan="1"></span>
-          <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${T("tarifeye göre")}</span>
+          <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):(isTomorrow(s.t,now)?T("Yarın {0}'de geçiyor (ilk sefer)",fmt(s.t)):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now)))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${T("tarifeye göre")}</span>
           ${s.ara.length?`<details><summary>${s.ara.length+1} ${T("durak")} · ~${dk(s.dk)}</summary><div class="ara">${s.ara.map(esc).join(" · ")}</div></details>`:`<span>1 ${T("durak")} · ~${dk(s.dk)}</span>`}
           <b style="margin-top:6px">${T("İn:")} ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
