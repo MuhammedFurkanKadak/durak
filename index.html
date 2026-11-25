@@ -298,7 +298,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611251040";
+const APP_VERSION="202611251050";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1041,16 +1041,16 @@ const chain=(o,single,compact)=>{ let ri=0; const all=[o,...(single?[]:(o.alts||
 // ================= ÜCRETLER (yetişkin tam, İstanbulkart; 20.07.2026 tarifesi) =================
 // İETT/ÖHO otobüs, metro, tramvay, füniküler, teleferik: ilk biniş 46,20; 2 saat içindeki aktarmalar 34,40 / 26,42 / 17,18…
 // Mesafeye göre değişenlerde her zaman en yüksek ücret: metrobüs 68,59 (metrobüse geçişte indirim yok), Marmaray 82,17.
-// Minibüs: UKOME mesafe tarifesi, hattın tamamının uzunluğuna göre (en yüksek). Dolmuş: hat ücreti tablosu (UKOME).
+// Minibüs: UKOME mesafe tarifesi (0–4 km 43, 4–7 45, 7–11 46, 11–15 47, 15+ 52 TL), hattın tamamının uzunluğuna göre (en yüksek). Dolmuş: hat ücreti tablosu (UKOME).
 // Vapur: Şehir Hatları'nın bilinen en yüksek tam ücreti 59,28. Kesin olmayanlar "≈" ile gösterilir.
 // İETT otobüslerinde 00:30–05:30 arası gece seferleri çift bilettir (iett.istanbul hat sayfası notu).
 const FARE={tam:46.20, akt:[34.40,26.42,17.18,17.18,17.18], metrobus:68.59, marmaray:82.17, vapur:59.28};
 const DM_FARE={BŞK1:55,BŞK2:55,BŞK3:65,BŞK5:65,D11:95,D15:110,D41:70,D44:65,D46:55,D21:55,D22:65,D25:55,D28:145,D30:55,D58:55,D31:130,D34:70,D38:65,D61:145};
 const lineKm={};
 function minibusFare(L){
-  if(lineKm[L.id]===undefined){ let mx=0; L.dir.forEach(x=>{let d=0; for(let i=1;i<x.s.length;i++) if(STOPS[x.s[i]]&&STOPS[x.s[i-1]]) d+=hav(STOPS[x.s[i-1]].p,STOPS[x.s[i]].p); mx=Math.max(mx,d);}); lineKm[L.id]=mx*1.25/1000; }
+  if(lineKm[L.id]===undefined){ let mx=0; L.dir.forEach(x=>{let d=0; for(let i=1;i<x.s.length;i++) if(STOPS[x.s[i]]&&STOPS[x.s[i-1]]) d+=hav(STOPS[x.s[i-1]].p,STOPS[x.s[i]].p); mx=Math.max(mx,d);}); lineKm[L.id]=mx/1000; }
   const km=lineKm[L.id];
-  return km<=4?43:km<=7?45:km<=11?46:km<=15?47:km<=20?52:52+1.5*Math.ceil(km-20);
+  return km<=4?43:km<=7?45:km<=11?46:km<=15?47:52; // UKOME: 15 km üstü 52 TL (en yüksek dilim)
 }
 function fareOf(o){
   if(!o.legs) return {legs:[],total:0,approx:false};
