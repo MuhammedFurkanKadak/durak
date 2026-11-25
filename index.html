@@ -424,7 +424,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611260130";
+const APP_VERSION="202611260145";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -622,7 +622,7 @@ function viewStop(){
   <button class="star ${isFav("d",n)?"on":""}" data-fd="${esc(n)}">${isFav("d",n)?"★":"☆"}</button></div>
   <button class="btn" style="width:100%;margin-top:12px" data-goto="${esc(n)}">${T("Buraya nasıl giderim?")}</button></div>
   <div class="stops">${deps.slice(0,30).map(x=>`
-    <div class="dep" data-line="${x.L.id}" data-d="${x.di}" data-lsid="${x.sid}" data-lb="${esc(x.L.b)}">${badge(x.L)}
+    <div class="dep" data-line="${x.L.id}" data-d="${x.di}" data-lsid="${x.sid}" data-lb="${esc(x.L.b)}" data-t0="${x.t[0]}">${badge(x.L)}
       <div class="t"><b>${yonT(esc(x.yon))}</b><span>${x.L.t==="minibus"||x.L.t==="dolmus"?esc(x.L.n)+" · ":""}${T("Sonraki:")} ${x.t.map(fmt).join(", ")}</span><span class="lv"></span></div>
       <div class="m">${inMin(x.t[0])}<small>${T("kaldı")}</small></div></div>`).join("")||`<div class="empty">${T("Bugün sefer kalmadı.")}</div>`}</div>`;
 }
@@ -1461,12 +1461,16 @@ async function liveRefresh(){
     const items=(per.get(e.dataset.lsid)||[]).flatMap(c=>LIVE_C[c]?LIVE_C[c].items:[])
       .filter(it=>it.h===e.dataset.lb&&it.dk!=null&&!it.b).sort((a,b)=>a.dk-b.dk);
     const lvEl=e.classList.contains("lv")?e:e.querySelector(".lv"); if(!lvEl) return;
-    if(!items.length){ lvEl.innerHTML=""; return; }
+    if(!items.length){ lvEl.innerHTML=""; delete e.dataset.lt; return; }
     const mins=items.slice(0,3).map(it=>it.dk<=0?T("şimdi"):it.dk+DK());
     if(e.dataset.lplan) lvEl.innerHTML=`<i class="ld"></i>${T("Canlı: araç {0} sonra durakta",items[0].dk<=0?T("şimdi"):dk(items[0].dk))}${items.length>1?` · ${T("sonraki")} ${mins.slice(1).join(", ")}`:""}`;
     else { lvEl.innerHTML=`<i class="ld"></i>${T("Canlı")}: ${mins.join(", ")}`;
-      const m=e.querySelector(".m"); if(m) m.innerHTML=`${items[0].dk<=0?T("Şimdi"):dk(items[0].dk)}<small class="livet">${T("canlı")}</small>`; }
+      const m=e.querySelector(".m"); if(m) m.innerHTML=`${items[0].dk<=0?T("Şimdi"):dk(items[0].dk)}<small class="livet">${T("canlı")}</small>`;
+      e.dataset.lt=nowMin()+items[0].dk; }
   });
+  // Durak ekranı: canlı varışa göre yeniden sırala (tarifede sabaha kalmış ama canlıda gelen araç üste çıksın)
+  if(state.stop){ const box=els[0]&&els[0].parentElement; if(box){ const key=e=>+(e.dataset.lt||e.dataset.t0||1e9);
+    [...box.querySelectorAll(":scope > .dep")].sort((a,b)=>key(a)-key(b)).forEach(e=>box.appendChild(e)); } }
   liveTimer=setTimeout(()=>{ if(!document.hidden) liveRefresh(); },30000);
 }
 
