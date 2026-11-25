@@ -324,7 +324,7 @@ const EN={
 "Bin:":"Board:","tam bilet":"full fare","Şimdi kalkıyor":"Departing now","{0}'de kalkıyor ({1} sonra)":"Departs {0} (in {1})","{0} bekleme":"{0} wait","Hemen aktarma":"Immediate transfer",
 "tarifeye göre":"scheduled","İn:":"Get off:","Varış":"Arrival","Toplam ücret:":"Total fare:",
 "Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs, Marmaray ve M11'de en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.":"Adult full fare with Istanbulkart. Transfer discounts within 2 hours applied; metrobus, Marmaray and M11 use the longest-distance fare; İETT night buses (00:30–05:30) cost a double fare.",
-"≈ işaretliler (minibüs, dolmuş, vapur, M11) en yüksek tahmini ücrettir.":"Items marked ≈ (minibus, dolmuş, ferry, M11) are the highest estimated fare.",
+"≈ işaretliler (minibüs, bazı vapur ve havalimanı hatları) kesinleşmemiş, en yüksek tahmini ücrettir.":"Items marked ≈ (minibus, some ferry and airport lines) are unconfirmed — the highest estimated fare.",
 "Konum izni yok":"No location permission","Konum alınamıyor":"Can't get location","Bu cihazda konum yok":"No location on this device",
 "{0} için {1} durağında bekle":"Wait at {1} for {0}","{0} durak sonra, {1} durağında in":"In {0} stops, get off at {1}","Vardın":"You have arrived",
 "Konumun bulundu, takip başladı":"Location found, tracking started","Sonraki durakta in: {0}":"Get off at the next stop: {0}","İki durak sonra ineceksin":"You get off in two stops",
@@ -416,7 +416,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611251700";
+const APP_VERSION="202611252230";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1171,15 +1171,52 @@ const chain=(o,single,compact)=>{ let ri=0; const all=[o,...(single?[]:(o.alts||
 // İETT/ÖHO otobüs, metro, tramvay, füniküler, teleferik: ilk biniş 46,20; 2 saat içindeki aktarmalar 34,40 / 26,42 / 17,18…
 // Mesafeye göre değişenlerde her zaman en yüksek ücret: metrobüs 68,59 (metrobüse geçişte indirim yok), Marmaray 82,17.
 // Minibüs: UKOME mesafe tarifesi (0–4 km 43, 4–7 45, 7–11 46, 11–15 47, 15+ 52 TL), hattın tamamının uzunluğuna göre (en yüksek). Dolmuş: hat ücreti tablosu (UKOME).
-// Vapur: Şehir Hatları'nın bilinen en yüksek tam ücreti 59,28. Kesin olmayanlar "≈" ile gösterilir.
+// Kaynak: İBB Meclisi 17.07.2026 kararı, 20.07.2026 tarifesi (uploads.ibb.istanbul/uploads/17_TEMMUZ_2026_M_K_R_1_09b8520e8f.pdf)
+// M11 (Halkalı–İstanbul Havalimanı–Gayrettepe, TCDD) istasyon sayısına göre 37,40–73,19: en yüksek 73,19.
+// Vapur: hat hat tarife (aşağıda). Vapura aktarma 41,43 / 34,28 / 29,92; Adalar 151,23 (aktarmada da). Tabloda bulunamayan hat "≈" en yüksek merkez hat ücreti.
+// Havalimanı H- hatları: 92,40 (tarifede H-1…H-5; diğerleri "≈").
 // İETT otobüslerinde 00:30–05:30 arası gece seferleri çift bilettir (iett.istanbul hat sayfası notu).
-const FARE={tam:46.20, akt:[34.40,26.42,17.18,17.18,17.18], metrobus:68.59, marmaray:82.17, vapur:59.28};
+const FARE={tam:46.20, akt:[34.40,26.42,17.18,17.18,17.18], metrobus:68.59, marmaray:82.17, m11:73.19, havalimani:92.40,
+  vapurAkt:[41.43,34.28,29.92,29.92,29.92], adalar:151.23, vapurMax:76.90};
+// [iskele anahtar kelimeleri (hepsi hat adında geçmeli), tam ücret]; sıra önemli: özelden genele
+const VAPUR_FARE=[
+  [["AVCILAR","BOSTANCI"],195.58],[["KARAKÖY","BOSTANCI"],76.90],[["ORTAKÖY","KADIKÖY"],71.07],[["AŞİYAN","ÜSKÜDAR"],68.53],
+  [["KADIKÖY","EMİNÖNÜ"],65.21],[["KADIKÖY","KARAKÖY"],65.21],[["KADIKÖY","BEŞİKTAŞ"],65.21],[["ÜSKÜDAR","KADIKÖY"],62.70],
+  [["KADIKÖY","KABATAŞ"],62.70],[["ÇENGELKÖY","KABATAŞ"],61.85],[["BEYKOZ","SARIYER"],61.04],[["ÜSKÜDAR","EMİNÖNÜ"],58.52],
+  [["ORTAKÖY","ÜSKÜDAR"],51.81],[["KABATAŞ","ÜSKÜDAR"],51.81],[["BEYKOZ","YENİKÖY"],50.97],[["BEŞİKTAŞ","ÜSKÜDAR"],50.15],
+  [["İSTİNYE","ÇUBUKLU"],50.15],[["KÜÇÜKSU","AŞİYAN"],50.15]];
+const ADA=/BÜYÜKADA|HEYBELİADA|BURGAZADA|KINALIADA|ADALAR/;
+// Not: Eylül 2025 tarifesi ×1,32 (Şubat %20 + Temmuz %10) bu değerleri tutuyor (ör. Kadıköy–Eminönü 49,40→65,21; Haliç/Boğaz/uğramalı 58,26→76,90).
+// g verilirse binilen ve inilen iskeleye göre (ör. Adalar vapuruyla Eminönü→Kadıköy = merkez hat ücreti)
+function vapurFare(L,g){
+  if(g){ const x=L.dir[g.di], up=s=>(STOPS[x.s[s]]?STOPS[x.s[s]].n:"").toLocaleUpperCase("tr-TR");
+    const seg=up(g.from)+" - "+up(g.to);
+    // Adalar vapurunda adaya gidilmiyorsa (iskele adlarında "Adalar" geçebilir; sadece ada adlarına bak) merkez hat ücreti
+    if(ADA.test((L.n||"").toLocaleUpperCase("tr-TR"))&&!/BÜYÜKADA|HEYBELİADA|BURGAZADA|KINALIADA/.test(seg))
+      for(const [ks,f] of VAPUR_FARE) if(ks.every(k=>seg.includes(k))) return {f}; }
+  const n=(L.n||"").toLocaleUpperCase("tr-TR");
+  if(/IDO|İDO/i.test(L.a||"")){                                        // İDO
+    if(n.includes("HAREM")) return {f:54.33};                          // Sirkeci–Harem arabalı vapur (yolcu)
+    if(ADA.test(n)) return n.includes("BOSTANCI")?{f:171.89,ada:true}:{f:272.18,ada:true};
+    return {f:193.33,ap:true};                                         // deniz otobüsü: tarifedeki en yüksek, kesin değil
+  }
+  if(ADA.test(n)){
+    if(n.includes("AVCILAR")) return {f:195.58,ada:true,ap:true};
+    if(n.includes("BOSTANCI")&&!/EMİNÖNÜ|KADIKÖY|KABATAŞ|BEŞİKTAŞ|KARAKÖY|SİRKECİ|BAKIRKÖY|BÜYÜKÇEKMECE/.test(n)) return {f:171.89,ada:true};
+    return {f:FARE.adalar,ada:true};                                   // Adalar (Adakartsız tam)
+  }
+  if(/TURU|FESTİVAL/.test(n)) return {f:FARE.vapurMax,ap:true};        // gezi turları: ücreti ayrı olabilir
+  if(/HALİÇ|EYÜP|BOĞAZ/.test(n)) return {f:FARE.vapurMax};             // Haliç ve Boğaz hatları: 76,90
+  for(const [ks,f] of VAPUR_FARE) if(ks.every(k=>n.includes(k))) return {f};
+  return {f:FARE.vapurMax,ap:true};                                    // tabloda adı geçmeyen hat: uğramalı hat ücreti, kesin değil
+}
 const DM_FARE={BŞK1:55,BŞK2:55,BŞK3:65,BŞK5:65,D11:95,D15:110,D41:70,D44:65,D46:55,D21:55,D22:65,D25:55,D28:145,D30:55,D58:55,D31:130,D34:70,D38:65,D61:145};
 const lineKm={};
 function minibusFare(L){
   if(lineKm[L.id]===undefined){ let mx=0; L.dir.forEach(x=>{let d=0; for(let i=1;i<x.s.length;i++) if(STOPS[x.s[i]]&&STOPS[x.s[i-1]]) d+=hav(STOPS[x.s[i-1]].p,STOPS[x.s[i]].p); mx=Math.max(mx,d);}); lineKm[L.id]=mx/1000; }
   const km=lineKm[L.id];
-  return km<=4?43:km<=7?45:km<=11?46:km<=15?47:52; // UKOME: 15 km üstü 52 TL (en yüksek dilim)
+  // UKOME 20.07.2026: 0–4 43, 4–7 45, 7–11 46, 11–15 47, 15–20 52; 20 km üzeri her km için +1,50
+  return km<=4?43:km<=7?45:km<=11?46:km<=15?47:km<=20?52:52+1.5*Math.ceil(km-20);
 }
 // İzmir (1.4.2026 tarifesi): ESHOT, metro, tramvay tam 35 TL; ilk binişten itibaren 90 dk içindeki aktarmalar ücretsiz. İZBAN tam 40 TL, aktarma dışında (mesafeye göre değişebilir: ≈).
 const IZM={tam:35, izban:40};
@@ -1193,7 +1230,7 @@ function fareIzm(o){
 }
 function fareNote(FR){
   if(CITYK==="izm") return T("Yetişkin tam İzmirim Kart. ESHOT, metro ve tramvayda 90 dakika içindeki aktarmalar ücretsiz; İZBAN ayrı ücretlidir.")+(FR.approx?" "+T("≈ işaretliler (İZBAN) en yüksek tahmini ücrettir."):"");
-  return T("Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs, Marmaray ve M11'de en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.")+(FR.approx?" "+T("≈ işaretliler (minibüs, dolmuş, vapur, M11) en yüksek tahmini ücrettir."):"");
+  return T("Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs, Marmaray ve M11'de en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.")+(FR.approx?" "+T("≈ işaretliler (minibüs, bazı vapur ve havalimanı hatları) kesinleşmemiş, en yüksek tahmini ücrettir."):"");
 }
 function fareOf(o){
   if(!o.legs) return {legs:[],total:0,approx:false};
@@ -1205,10 +1242,12 @@ function fareOf(o){
     else if(L.t==="dolmus"){ f=DM_FARE[L.b]; if(f===undefined){ f=145; ap=true; } }
     else {
       if(first===null||g.board-first>120){ first=g.board; k=0; } else k++;
-      if(L.id==="m11"){ f=FARE.marmaray; ap=true; } // M11 (TCDD) mesafe tarifeli: en yüksek, tahmini
-      else if(L.t==="metrobus") f=FARE.metrobus;
+      if(L.t==="metrobus") f=FARE.metrobus;
       else if(L.t==="marmaray") f=FARE.marmaray;
-      else if(L.t==="vapur"){ f=FARE.vapur; ap=true; }
+      else if(L.id==="m11") f=FARE.m11;
+      else if(/^H-\d/.test(L.b)){ f=FARE.havalimani; ap=!/^H-[1-5]$/.test(L.b); }
+      else if(L.t==="vapur"){ const v=vapurFare(L,g); ap=!!v.ap;
+        f=(k===0||v.ada)?v.f:Math.min(v.f,FARE.vapurAkt[Math.min(k-1,FARE.vapurAkt.length-1)]); }
       else f=k===0?FARE.tam:FARE.akt[Math.min(k-1,FARE.akt.length-1)];
       // İETT gece seferleri (00:30–05:30 arası biniş) çift bilet
       const hm=((g.board%1440)+1440)%1440;
