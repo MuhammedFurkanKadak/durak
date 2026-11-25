@@ -424,7 +424,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611260145";
+const APP_VERSION="202611260210";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -967,13 +967,26 @@ function legVariants(o,now){
 }
 // Seçenekleri sırala: Pareto (her açıdan daha kötüsü olmayanlar) önce, etiketli
 // Sıralama: yolculuk süresine göre (evden çıkıştan varışa). Her açıdan daha kötü olanlar (süre, aktarma, yürüme) elenir.
+// Araç binilen duraktan sonra konuma daha yakın bir duraktan da geçiyorsa oradan bin (geri yürüyüp aracı
+// kendi önünden geçerken yakalamak saçma); aynı şekilde varıştan önce hedefe daha yakın durakta in.
+function smoothEnds(o){
+  if(o.walk||o._se||!o.legs||!o.legs.length) return; o._se=1;
+  const P=id=>STOPS[id].p, g=o.legs[0], x=LINES[g.li].dir[g.di];
+  if(M.A&&o.w1){ let bk=-1, bd=o.w1.m;
+    for(let k=g.from+1;k<g.to;k++){ const sd=x.s[k], d=(M.Aids&&M.Aids.includes(sd))?0:hav(M.A,P(sd)); if(d<bd-30){ bd=d; bk=k; } }
+    if(bk>=0){ g.board+=x.o[bk]-x.o[g.from]; g.from=bk; o.w1={sid:x.s[bk],m:Math.round(bd),w:walkMin(bd)}; } }
+  const h=o.legs[o.legs.length-1], y=LINES[h.li].dir[h.di];
+  if(M.B&&o.w2){ let bk=-1, bd=o.w2.m;
+    for(let k=h.from+1;k<h.to;k++){ const sd=y.s[k], d=(M.Bids&&M.Bids.includes(sd))?0:hav(P(sd),M.B); if(d<bd-30){ bd=d; bk=k; } }
+    if(bk>=0){ const end=h.board+y.o[bk]-y.o[h.from], w=walkMin(bd); h.to=bk; o.w2={sid:y.s[bk],m:Math.round(bd),w}; o.arr=Math.min(o.arr,end+w); } }
+}
 function rank(all,now,limit){
   // Bulunan iyi seçeneklere aynı güzergâhtaki diğer hatları ekle (bir kez)
   const bd0=Math.min(...all.filter(o=>!o.walk).map(o=>metrics(o).dur),1e9);
   for(let j=0,L0=all.length;j<L0;j++){ const o=all[j]; if(o.walk||o._x||o._v) continue; if(metrics(o).dur>bd0+40) continue; o._x=1; all.push(...legVariants(o,now)); }
   const byKey={};
   // Aynı hat dizisi: en kısa süreni, eşitse en erken çıkanı tut
-  all.forEach(o=>{ o.mt=metrics(o); const k=o.walk?"walk":o.legs.map(l=>l.li).join(">"); const q=byKey[k];
+  all.forEach(o=>{ smoothEnds(o); o.mt=metrics(o); const k=o.walk?"walk":o.legs.map(l=>l.li).join(">"); const q=byKey[k];
     if(!q||o.mt.dur<q.mt.dur-1||(Math.abs(o.mt.dur-q.mt.dur)<=1&&o.mt.leave<q.mt.leave)) byKey[k]=o;
     // aynı hat dizisinin en erken varanı da kalsın ("En erken varış" kaybolmasın)
     if(o.mt.leave>=now-1){ const qa=byKey["@"+k]; if(!qa||o.arr<qa.arr-0.5||(Math.abs(o.arr-qa.arr)<=0.5&&o.mt.dur<qa.mt.dur)) byKey["@"+k]=o; } });
@@ -984,7 +997,12 @@ function rank(all,now,limit){
     return LINES[l.li].b===LINES[p.li].b&&LINES[l.li].t!=="minibus"&&LINES[l.li].t!=="dolmus"&&p.to<LINES[p.li].dir[p.di].s.length-1; });
   // Şu an (8 saat içinde) toplu taşıma yoksa ya da gece geç saatse: ertesi sabah 09:00'a kadarki seferler de gösterilsin
   const lateCap=Math.max(480,dayEnd(now)+540-now);
-  const cand=Object.values(byKey).filter(o=>!sameHop(o)&&o.mt.leave>=now-1&&o.mt.leave-now<=lateCap&&o.mt.walk<6000)
+  // Aktarmada çok uzun bekleme (gece araçla gidip durakta saatlerce sabahı beklemek) anlamsız: 45 dk üstü aktarma beklemesi olanı ele
+  const legEnd=g=>{const x=LINES[g.li].dir[g.di];return g.board+x.o[g.to]-x.o[g.from];};
+  const longWait=o=>!o.walk&&o.legs.some((g,i)=>i>0&&g.board-legEnd(o.legs[i-1])>45);
+  const cand0=Object.values(byKey).filter(o=>!sameHop(o)&&o.mt.leave>=now-1&&o.mt.leave-now<=lateCap&&o.mt.walk<6000);
+  // Uzun beklemeli plan sadece başka seçenek varsa elenir; tek yol oysa gösterilir
+  const cand1=cand0.filter(o=>!longWait(o)); const cand=(cand1.some(o=>!o.walk)?cand1:cand0)
     .sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
   const kept=[], other=[];
   for(const o of cand){
@@ -1020,7 +1038,8 @@ const sameRoute=(a,b)=>{
 function groupPlans(list){
   const groups=[];
   for(const o of list){
-    const g=groups.find(g=>sameRoute(g,o)&&o.mt.dur<=g.mt.dur+40);
+    // "En erken varış" seçeneği başka bir kartın içinde kaybolmasın (kartta görünen saat başka olurdu): ayrı kart
+    const g=(o.tags||[]).includes("En erken varış")?null:groups.find(g=>sameRoute(g,o)&&o.mt.dur<=g.mt.dur+40);
     // aynı hat(lar) aynı saatte (sadece varyant farkı) tekrar eklenmesin
     const sig=p=>p.legs.map(l=>LINES[l.li].b+"@"+fmt(l.board)).join(">");
     if(g){ if(sig(g)!==sig(o)&&!g.alts.some(a=>sig(a)===sig(o))) g.alts.push(o);
