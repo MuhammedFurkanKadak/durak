@@ -298,7 +298,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611251050";
+const APP_VERSION="202611251107";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -498,7 +498,8 @@ function viewStop(){
 
 function viewFav(){
   const hs=LINES.filter(L=>isFav("h",L.id));
-  return `<h3 class="sec">Hatlar</h3><div class="list">${hs.map(L=>`
+  return `<h3 class="sec">Yolculuklar</h3><div class="list">${(fav.r||[]).map((t,i)=>tripRow(t,"data-favtrip",i,true)).join("")||`<div class="empty">Nasıl Giderim'deki son yolculuklarda ☆'a dokunarak ekle.</div>`}</div>
+  <h3 class="sec">Hatlar</h3><div class="list">${hs.map(L=>`
     <div class="item" data-line="${L.id}">${badge(L)}<div class="t"><b>${esc(L.n)}</b><span>${tad(L)}</span></div>
     <button class="star on" data-fh="${L.id}">★</button></div>`).join("")||`<div class="empty">Hat sayfasında ☆'a dokunarak ekle.</div>`}</div>
   <h3 class="sec">Duraklar</h3><div class="list">${fav.d.map(n=>`
@@ -549,7 +550,13 @@ function homeHTML(){
 }
 document.addEventListener("click",e=>{
   if(e.target.closest("[data-fd]")) return;
-  const b=e.target.closest("[data-ftrip],[data-trip],[data-favtrip],[data-gostop]"); if(!b||!document.getElementById("plans").contains(b)) return;
+  const b=e.target.closest("[data-ftrip],[data-trip],[data-favtrip],[data-gostop]"); if(!b) return;
+  // Favoriler sekmesinden: yolculuğa dokununca Nasıl Giderim'e geç ve rotayı hesapla
+  if(!document.getElementById("plans").contains(b)){
+    if(b.dataset.ftrip){ e.stopPropagation(); fav.r.splice(+b.dataset.ftrip.split(":")[1],1); saveFav(); render(); return; }
+    if(b.dataset.favtrip!==undefined){ e.stopPropagation(); const t=fav.r[+b.dataset.favtrip]; hist=[]; go({tab:"rota",line:null,stop:null,q:""}); setTimeout(()=>runTrip(t),60); }
+    return;
+  }
   if(b.dataset.ftrip){ e.stopPropagation(); const [a,i]=b.dataset.ftrip.split(":"); return toggleFavTrip(a==="data-trip"?recent[+i]:fav.r[+i]); }
   if(b.dataset.trip!==undefined) return runTrip(recent[+b.dataset.trip]);
   if(b.dataset.favtrip!==undefined) return runTrip(fav.r[+b.dataset.favtrip]);
