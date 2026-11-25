@@ -67,6 +67,11 @@ header{display:flex;align-items:center;gap:10px;margin:-12px -16px 14px;padding:
 #mapview.det #homeback,#mapview.nav #homeback{display:none}
 #homeback{margin:0 0 6px}
 [hidden]{display:none!important}
+.fpill{display:inline-block!important;margin-top:4px;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand)!important;font-weight:700;font-size:12.5px!important;width:max-content}
+.dur .fare{display:block;margin-top:3px;font-weight:700;color:var(--brand);font-size:12.5px}
+.faresum{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.faresum b{display:block;font-size:16px}
+.faresum span{display:block;font-size:12.5px;color:var(--muted);margin-top:4px}
 .themeb{margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid color-mix(in srgb,var(--hdrink) 25%,transparent);background:color-mix(in srgb,var(--hdrink) 12%,transparent);color:var(--hdrink);display:grid;place-items:center;cursor:pointer;flex:none}
 .logo{width:38px;height:38px;border-radius:11px;background:#fff;color:#1f4fd8;display:grid;place-items:center;flex:none}
 header h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -179,6 +184,8 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .dhead>div:first-child{flex:1;min-width:0}
 .steps{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:6px 14px}
 .step{display:flex;gap:12px;padding:12px 0;position:relative}
+.step .ic .cb{max-width:60px;font-size:min(13px,var(--fs,13px))}
+.step .ic .cb.long{font-size:9.5px;padding-left:3px;padding-right:3px;max-width:none;overflow:visible;text-overflow:clip;letter-spacing:-.2px}
 .step .ic{width:52px;flex:none;display:flex;justify-content:center;position:relative;z-index:1}
 .step .ic>span:not(.cb){width:30px;height:30px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-size:16px}
 .step .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -291,7 +298,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611250116";
+const APP_VERSION="202611250511";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -348,12 +355,13 @@ const mini=L=>`<i style="background:${lc(L)}">${esc(L.b.length>6?L.b.slice(0,6):
 // ================= VERİ =================
 let LINES=[], STOPS={}, IDX={}, BYNAME={}, NAMES=[], GRID={};
 const G=0.005, gk=(la,lo)=>Math.floor(la/G)+":"+Math.floor(lo/G);
-// Minibüs hat kodları (UKOME kodları; veride sadece hat adı var). Kodu bilinmeyenler "MB" kalır.
-const MBKOD={"7419":"C56","7115":"A37","7378":"C501","7282":"C315","7376":"C354","7142":"A45","7258":"C125","7391":"C58","7276":"C312","7152":"B46","7407":"BL103","7229":"C109","7377":"17","7150":"C301","7213":"A41","7114":"A04","7486":"A17","7277":"C313","7221":"C306","7389":"C57","7380":"C52","7197":"C72","7201":"A213","7200":"A208","7227":"C308","7212":"A42","7363":"BL100","7245":"C117","7392":"C64","7298":"C87","7292":"C82","7261":"C300","7105":"A26","7388":"C56","7176":"B43","7230":"C309","7302":"A30","7252":"C76","7189":"A27","7233":"C115","7117":"A39","7191":"A27","7257":"C78","7175":"B37","7307":"A36","7344":"C91","7220":"C305","7199":"A201","7136":"A200","7240":"C116","7107":"A02","7335":"C89","7375":"C351","7165":"B34","7262":"A216","7457":"A18","7294":"C83","7356":"C93","7390":"C58","7224":"A43","7271":"A11","27208":"C311","27207":"C311","7263":"A34","7238":"C115","7373":"C311","7234":"C310","7387":"C56","7304":"A30","7442":"A28","7108":"A03","7295":"C84","7239":"C311","7266":"A19","7395":"C65","7455":"A19","7110":"A03","7116":"A38","7253":"C77","7519":"C71","7255":"C77","7119":"A39","7286":"C80","7210":"A72","27353":"BL401","27206":"C315","7281":"C314","7347":"C91","7202":"A215","7301":"C88","7194":"C71","7396":"C65","7198":"A73","7174":"C71","7300":"A24","7403":"C70","7167":"B34","7171":"B35","7357":"C93","7402":"C70","7196":"A71","7162":"B33","7180":"B43","7242":"C116","7399":"C67","7293":"A24","7326":"A24","7489":"C86","7259":"C81","7297":"C84","7514":"B40","7272":"A11","7383":"C55","7284":"C317","7343":"C90","7313":"A32","7246":"C75","7209":"C74","7219":"C304","7327":"C310","7379":"C51","7325":"A34","7433":"C93","7247":"C76","7400":"C70","7480":"C70","7367":"BL401","7289":"C80","7398":"C56","7251":"C124","7256":"C124","7250":"C118","7397":"C66","7303":"A26","7185":"A26","7309":"A31","7296":"A31","7360":"BL400","7364":"BL400","7361":"A29","7369":"A29","7350":"A32"};
+// Minibüs ve dolmuş hat kodları: İBB "Minibüsüm Nerede" listesi + İBB minibüs güzergâh verisiyle eşleştirildi.
+// Kodu bulunamayanlar "MB"/"DM" kalır. Sarıyer hatlarının resmi kodu "SRY".
+const MBKOD={"27196":"C367","28185":"SRY","28182":"SRY","27281":"C74","7514":"SRY","7216":"A27","7217":"A16","7371":"A11","7214":"A41","7272":"A11","7271":"A11","7365":"A31","28184":"SRY","28183":"SRY","28181":"SRY","7508":"SRY","27203":"C307","27366":"ŞL15","27204":"C307","27365":"ŞL16","27363":"ŞL14","27359":"ŞL11","27358":"ŞL10","7485":"ŞL09","7279":"ŞL08","7477":"ŞL07","7275":"ŞL06","27353":"BL401","7364":"BL400","7362":"BL400","7359":"BL400","7366":"BL400","7360":"BL400","7489":"C86","27347":"C125","27208":"C311","27276":"C317","27207":"C311","27206":"C307","27205":"C307","7404":"BL101","7406":"BL101","7467":"BL101","7419":"C56","7388":"C56","7418":"C55","7384":"C55","7383":"C55","7284":"C317","7281":"C312","7250":"C118","7115":"A37","7397":"C66","7263":"A34","7139":"A43","7478":"BL110","7511":"SRY","7261":"C367","7248":"C76","7347":"C91","7336":"C89","7289":"C127","7257":"C78","7378":"C501","7479":"A71","7427":"A11","7238":"C115","7202":"A215","7507":"SRY","7164":"B33","7181":"A24","7412":"BL109","7282":"C307","7260":"C125","7376":"C354","7518":"BL110","7268":"BL200","7256":"C124","7301":"C88","7345":"ŞL01","7373":"C311","7142":"A45","7258":"C125","7439":"A01","7331":"C125","7443":"A28","7481":"ŞL04","7488":"C58","7305":"A30","7391":"C58","7175":"B37","7234":"C310","7299":"A30","7445":"A29","7387":"C56","7194":"C71","7304":"A30","7186":"A16","7442":"A28","7176":"B43","7276":"C312","7307":"A36","7322":"A24","7187":"A48","7138":"A43","7286":"C127","7370":"A08","7343":"C90","7235":"A49","7251":"C124","7152":"B46","7236":"C125","7344":"C91","7183":"A48","7108":"A03","7465":"BL145","7113":"A03","7120":"A239","7122":"A239","7144":"A46","7346":"A28","7121":"A239","7407":"BL103","7396":"C65","7295":"C84","7126":"A02","7483":"ŞL04","7459":"BL145","7313":"A32","7220":"C311","7230":"C309","7246":"C75","7348":"ŞL02","7316":"B43","7198":"A73","7358":"ŞL05","7211":"A72","7174":"C71","7239":"C311","7449":"A32","7204":"A49","7309":"A31","7394":"C64","7308":"A43","7105":"A24","7303":"A24","7209":"C74","7219":"C304","7415":"C311","7302":"A30","7229":"C109","7306":"A03","7300":"A24","7266":"A19","7403":"C70","7327":"C310","7377":"17","7341":"C89","7510":"SRY","7274":"BL202","7259":"C81","7150":"C301","7199":"A201","7213":"A41","7185":"A24","7252":"C76","7461":"BL110","7146":"A46","7136":"A43","7114":"A04","7189":"A27","7486":"A17","7240":"C116","7349":"A24","7277":"C313","7167":"B34","7210":"A72","7484":"C79","7379":"C51","7315":"A07","7287":"C127","7413":"A08","7395":"C65","7297":"C84","7171":"B35","7135":"A43","7455":"A19","7221":"C367","7110":"A03","7487":"A43","7325":"A34","7243":"C75","7441":"BL401","7389":"C65","7233":"C115","7433":"C93","7247":"C76","7241":"A27","7361":"A29","7161":"B33","7163":"B33","7116":"A38","7447":"A29","7253":"C77","7374":"C319","7334":"C125","7296":"A31","7231":"A48","7386":"BL100","7107":"A02","7342":"C125","7357":"C93","7222":"A43","7402":"C70","7380":"C52","7128":"A02","7335":"C89","7337":"C89","7369":"A29","7375":"C351","7165":"B34","7262":"A216","7197":"C72","7448":"A31","7352":"ŞL03","7196":"A71","7140":"A43","7519":"C71","7457":"A03","7201":"A213","7200":"A208","7228":"A43","7178":"A48","7255":"C77","7147":"A47","7339":"A28","7372":"A11","7294":"C83","7270":"A11","7333":"A26","7410":"BL109","7512":"SRY","7227":"C308","7265":"A36","7162":"B33","7212":"A42","7180":"B43","7400":"C70","7242":"C116","7350":"A32","7363":"BL100","7399":"C67","7226":"A43","7285":"A16","7462":"BL145","7356":"C93","7119":"A239","7440":"A03","7480":"C70","7454":"A19","7422":"A28","7367":"BL401","7291":"C127","7117":"A239","7293":"A24","7390":"C58","7191":"A27","7501":"SRY","7224":"A43","7398":"C56","7326":"A24","7245":"C117","7392":"C64","7314":"A35","7414":"BL109","7393":"C64","7298":"C87","7292":"C82","3789":"D22","3743":"D28","3790":"D46","7079":"BŞK3","3753":"D41","3786":"D44","3745":"D11","3805":"D46","3775":"D38","3776":"D41","3750":"D15","3781":"D44","3806":"D15","3755":"D31","3788":"D22","3782":"D30","3779":"D21","3741":"D41","3799":"D11","3749":"D31","3780":"D34","3738":"D44","3778":"D44","3793":"D34","3785":"D61","3744":"D38","3752":"D41","3742":"D21"};
 async function loadData(){
   const D=await (await fetch("data.json")).json();
   LINES=D.lines;
-  LINES.forEach(L=>{ if(L.t==="marmaray") L.b=L.b.replace(/^Marmaray/i,"MR"); if(L.t==="minibus"&&MBKOD[L.id]) L.b=MBKOD[L.id]; if(L.id==="i17") L.t="minibus"; /* İETT listesindeki 17 Pendik–Kadıköy de minibüs */ });
+  LINES.forEach(L=>{ if(L.t==="marmaray") L.b=L.b.replace(/^Marmaray/i,"MR"); if((L.t==="minibus"||L.t==="dolmus")&&MBKOD[L.id]) L.b=MBKOD[L.id]; if(L.id==="i17") L.t="minibus"; /* İETT listesindeki 17 Pendik–Kadıköy de minibüs */ });
   for(const [id,[n,la,lo]] of Object.entries(D.stops)){
     STOPS[id]={id,n,la,lo,p:[la,lo]};
     (BYNAME[n]=BYNAME[n]||[]).push(id);
@@ -790,7 +798,7 @@ function legVariants(o,now){
       if(i===0){ w1m=(M.Aids&&M.Aids.includes(b))?0:hav(A,P(b)); if(w1m>o.w1.m+250) continue; ready=now+walkMin(w1m); }
       else { twm=prevStop===b?0:hav(P(prevStop),P(b)); if(twm>Math.max(g.tw||0,0)+250||twm>800) continue; ready=prevArr+(twm?walkMin(twm):0)+1; }
       for(const [li,di,pos] of (IDX[b]||[])){
-        const Ln=LINES[li]; if(li===g.li||(Ln.b===Lb&&Ln.b!=="MB"&&Ln.b!=="DM")) continue; const x=Ln.dir[di];
+        const Ln=LINES[li]; if(li===g.li||(Ln.b===Lb&&!["MB","DM","SRY"].includes(Ln.b))) continue; const x=Ln.dir[di];
         let q=-1; for(let j=pos+1;j<x.s.length;j++) if(aC[x.s[j]]!==undefined){ q=j; break; }
         if(q<0) continue;
         const ride=x.o[q]-x.o[pos], a=x.s[q]; let b0, w2m=0, tw2=0, arr=o.arr;
@@ -827,8 +835,10 @@ function rank(all,now,limit){
     // aynı hat dizisinin en erken varanı da kalsın ("En erken varış" kaybolmasın)
     if(o.mt.leave>=now-1){ const qa=byKey["@"+k]; if(!qa||o.arr<qa.arr-0.5||(Math.abs(o.arr-qa.arr)<=0.5&&o.mt.dur<qa.mt.dur)) byKey["@"+k]=o; } });
   for(const k in byKey) if(k[0]==="@"&&byKey[k.slice(1)]===byKey[k]) delete byKey[k];
-  // Aynı hattan inip yine aynı hatta binmek anlamsız ("araçta kal"): ele
-  const sameHop=o=>!o.walk&&o.legs.some((l,i)=>i>0&&LINES[l.li].b===LINES[o.legs[i-1].li].b&&LINES[l.li].b!=="MB"&&LINES[l.li].b!=="DM");
+  // Aynı hattan inip yine aynı hatta binmek anlamsız ("araçta kal"): ele. Minibüs/dolmuşta aynı kodlu farklı güzergâhlar olduğu için hariç.
+  const sameHop=o=>!o.walk&&o.legs.some((l,i)=>{ if(i===0) return false; const p=o.legs[i-1];
+    // önceki araç orada son durağına varıyorsa (sefer bitiyor) aynı hatta yeniden binmek gerçek bir aktarmadır
+    return LINES[l.li].b===LINES[p.li].b&&LINES[l.li].t!=="minibus"&&LINES[l.li].t!=="dolmus"&&p.to<LINES[p.li].dir[p.di].s.length-1; });
   const cand=Object.values(byKey).filter(o=>!sameHop(o)&&o.mt.leave>=now-1&&o.mt.leave-now<=480&&o.mt.walk<6000)
     .sort((a,b)=>a.mt.dur-b.mt.dur||a.mt.leave-b.mt.leave||a.mt.legs-b.mt.legs||a.mt.walk-b.mt.walk);
   const kept=[], other=[];
@@ -1026,6 +1036,42 @@ const chain=(o,single,compact)=>{ let ri=0; const all=[o,...(single?[]:(o.alts||
     return sh.map(L=>`<span class="cb" style="background:${lc(L)}">${bt(L)}</span>`).join(`<span class="alt">/</span>`)+(more?`<span class="cb plus">+${more}</span>`:""); }).filter(Boolean).join(`<span class="sep">›</span>`); };
 
 // Kısa, tıklanabilir seçenek kartları
+// ================= ÜCRETLER (yetişkin tam, İstanbulkart; 20.07.2026 tarifesi) =================
+// İETT/ÖHO otobüs, metro, tramvay, füniküler, teleferik: ilk biniş 46,20; 2 saat içindeki aktarmalar 34,40 / 26,42 / 17,18…
+// Mesafeye göre değişenlerde her zaman en yüksek ücret: metrobüs 68,59 (metrobüse geçişte indirim yok), Marmaray 82,17.
+// Minibüs: UKOME mesafe tarifesi, hattın tamamının uzunluğuna göre (en yüksek). Dolmuş: hat ücreti tablosu (UKOME).
+// Vapur: Şehir Hatları'nın bilinen en yüksek tam ücreti 59,28. Kesin olmayanlar "≈" ile gösterilir.
+// İETT otobüslerinde 00:30–05:30 arası gece seferleri çift bilettir (iett.istanbul hat sayfası notu).
+const FARE={tam:46.20, akt:[34.40,26.42,17.18,17.18,17.18], metrobus:68.59, marmaray:82.17, vapur:59.28};
+const DM_FARE={BŞK1:55,BŞK2:55,BŞK3:65,BŞK5:65,D11:95,D15:110,D41:70,D44:65,D46:55,D21:55,D22:65,D25:55,D28:145,D30:55,D58:55,D31:130,D34:70,D38:65,D61:145};
+const lineKm={};
+function minibusFare(L){
+  if(lineKm[L.id]===undefined){ let mx=0; L.dir.forEach(x=>{let d=0; for(let i=1;i<x.s.length;i++) if(STOPS[x.s[i]]&&STOPS[x.s[i-1]]) d+=hav(STOPS[x.s[i-1]].p,STOPS[x.s[i]].p); mx=Math.max(mx,d);}); lineKm[L.id]=mx*1.25/1000; }
+  const km=lineKm[L.id];
+  return km<=4?43:km<=7?45:km<=11?46:km<=15?47:km<=20?52:52+1.5*Math.ceil(km-20);
+}
+function fareOf(o){
+  if(!o.legs) return {legs:[],total:0,approx:false};
+  let first=null,k=0,total=0,approx=false; const legs=[];
+  for(const g of o.legs){
+    const L=LINES[g.li]; let f, ap=false;
+    if(L.t==="minibus"){ f=minibusFare(L); ap=true; }
+    else if(L.t==="dolmus"){ f=DM_FARE[L.b]; if(f===undefined){ f=145; ap=true; } }
+    else {
+      if(first===null||g.board-first>120){ first=g.board; k=0; } else k++;
+      if(L.t==="metrobus") f=FARE.metrobus;
+      else if(L.t==="marmaray") f=FARE.marmaray;
+      else if(L.t==="vapur"){ f=FARE.vapur; ap=true; }
+      else f=k===0?FARE.tam:FARE.akt[Math.min(k-1,FARE.akt.length-1)];
+      // İETT gece seferleri (00:30–05:30 arası biniş) çift bilet
+      const hm=((g.board%1440)+1440)%1440;
+      if(L.t==="otobus"&&hm>=30&&hm<330) f*=2;
+    }
+    legs.push({f,ap}); total+=f; approx=approx||ap;
+  }
+  return {legs,total:Math.round(total*100)/100,approx};
+}
+const tl=(v,ap)=>(ap?"≈":"")+v.toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})+" ₺";
 function planCard(o,k,now){
   const mt=o.mt||metrics(o), first=o.legs?o.legs[0]:null;
   const leaveTxt=mt.leave-now<=1?"Hemen çık":`Çıkış ${fmt(mt.leave)} · ${dk(mt.leave-now)} sonra`;
@@ -1033,9 +1079,10 @@ function planCard(o,k,now){
   if(o.alts&&o.alts.length){ const lv=[...new Set(o.alts.map(p=>(p.mt||metrics(p)).leave).filter(t=>t>mt.leave+0.5).sort((x,y)=>x-y).map(fmt))].slice(0,2);
     if(lv.length) sub+=` · sonra ${lv.join(", ")}`; }
   const tg=(o.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
+  const fr=fareOf(o);
   const meta=o.walk?"":` · 🚶 ${mt.walk>=1000?(mt.walk/1000).toFixed(1)+" km":mt.walk+" m"}`;
   return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o,false,true)}</div><div class="sub">${sub}${meta}</div></div>
-    <div class="dur">${dkBig(mt.dur)}<span>${fmt(mt.leave)}–${fmt(o.arr)}</span></div><span class="chev">›</span></div>`;
+    <div class="dur">${dkBig(mt.dur)}<span>${fmt(mt.leave)}–${fmt(o.arr)}</span>${o.walk?"":`<span class="fare">${tl(fr.total,fr.approx)}</span>`}</div><span class="chev">›</span></div>`;
 }
 // Kısa, tıklanabilir seçenek kartları
 // Kısa, tıklanabilir seçenek kartları
@@ -1102,21 +1149,22 @@ function openPlan(k){
   drawMarkers(ss[0].from,ss[ss.length-1].to);
   try{ map.fitBounds(L.featureGroup(routeLayer.getLayers().concat([mkA,mkB].filter(Boolean))).getBounds().pad(.12)); }catch(e){}
   drawVehicles();
-  const d=document.getElementById("detail");
+  const d=document.getElementById("detail"), FR=fareOf(o); let ri=-1;
   d.innerHTML=`    <button class="navgo" data-navstart="${k}">▶ Canlı yol tarifini başlat</button>
-    <div class="dhead"><div><div class="chain">${chain(o,true)}</div><div class="sub">${esc(M.Aname)} → ${esc(M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>çıkış ${fmt((o.mt||metrics(o)).leave)} · varış ${fmt(o.arr)}</span></div></div>
+    <div class="dhead"><div><div class="chain">${chain(o,true)}</div><div class="sub">${esc(M.Aname)} → ${esc(M.Bname)}</div></div><div class="dur">${dkBig((o.mt||metrics(o)).dur)}<span>çıkış ${fmt((o.mt||metrics(o)).leave)} · varış ${fmt(o.arr)}</span>${o.legs?`<span class="fare">Toplam ${tl(FR.total,FR.approx)}</span>`:""}</div></div>
     ${(o.alts&&o.alts.length)?`<h3 class="sec" style="margin-top:0">Aynı güzergâhta ${o.alts.length+1} seçenek</h3><div class="steps" style="margin-bottom:12px">${[o,...o.alts].map((p,j)=>{const m=p.mt||metrics(p);
       return `<div class="dep altrow ${j===0?"on":""}" data-alt="${k}:${j}"><div class="t"><div class="chain">${chain(p,true)}</div><span>Çıkış ${fmt(m.leave)} · biniş ${fmt(p.legs[0].board)} · varış ${fmt(p.arr)} · 🚶 ${m.walk} m</span></div><div class="m">${dk(m.dur)}<small>${j===0?"gösteriliyor":"seç"}</small></div></div>`;}).join("")}</div>`:""}
     <div class="steps"><div class="step"><div class="ic"><span>🏠</span></div><div class="tx"><b>${esc(M.Aname||"Başlangıç")}</b><span>${(o.mt||metrics(o)).leave-now<=1?"Hemen yola çık":"Yola çık: "+fmt((o.mt||metrics(o)).leave)+" ("+dk((o.mt||metrics(o)).leave-now)+" sonra)"}</span></div><div class="tm">${fmt((o.mt||metrics(o)).leave)}</div></div>${ss.map(s=>s.k==="walk"?(s.m>5?`
       <div class="step s-walk"><div class="ic"><span>🚶</span></div><div class="tx"><b>${esc(s.txt)}</b><span data-wk="${s.from.join()+";"+s.to.join()}">${s.m} m · ~${dk(s.dk)}</span></div><div class="tm"></div></div>`:""):`
-      <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
-        <div class="tx"><b>Bin: ${esc(s.on)}</b><span>${esc(s.yon)} yönü · ${esc(s.Ln.n)}</span>
+      <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb${bt(s.Ln).length>5?" long":""}" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
+        <div class="tx"><b>Bin: ${esc(s.on)}</b><span>${esc(s.yon)} yönü · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${tl(FR.legs[ri].f,FR.legs[ri].ap)} · tam bilet</span>`:""}
           <span class="wait">${s.first?(s.t-now<=1?"Şimdi kalkıyor":`${fmt(s.t)}'de kalkıyor (${dk(s.t-now)} sonra)`):(s.bekle?dk(s.bekle)+" bekleme":"Hemen aktarma")} · tarifeye göre</span>
           ${s.ara.length?`<details><summary>${s.ara.length+1} durak · ~${dk(s.dk)}</summary><div class="ara">${s.ara.map(esc).join(" · ")}</div></details>`:`<span>1 durak · ~${dk(s.dk)}</span>`}
           <b style="margin-top:6px">İn: ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
       <div class="step"><div class="ic"><span>🏁</span></div><div class="tx"><b>${esc(M.Bname)}</b><span>Varış</span></div><div class="tm">${fmt(o.arr)}</div></div>
-    </div>`;
+    </div>
+    ${o.legs?`<div class="faresum"><b>Toplam ücret: ${tl(FR.total,FR.approx)}</b><span>Yetişkin tam İstanbulkart. 2 saat içindeki aktarmalarda indirim uygulandı; metrobüs ve Marmaray'da en uzun mesafe ücreti alındı; 00:30–05:30 arası İETT gece seferleri çift bilettir.${FR.approx?" ≈ işaretliler (minibüs, dolmuş, vapur) en yüksek tahmini ücrettir.":""}</span></div>`:""}`;
   d.hidden=false; window.scrollTo(0,0);
 }
 
