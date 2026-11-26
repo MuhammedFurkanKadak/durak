@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261800";
+const APP_VERSION="202611261910";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1530,6 +1530,26 @@ function gpsEta(sid,b){
 }
 function liveFor(sid,b){
   const g=gpsEta(sid,b); if(g){ g.planned=false; return g; }
+  return liveIett(sid,b);
+}
+// ---- Doğruluk ölçümü: gösterilen tahminleri (GPS ve İETT ayrı ayrı) sunucuya kaydet; gerçek varışla sonra kıyaslanır
+const OLC_T={};
+function dirOf(sid,b){ for(const L of LINES){ if(L.b!==b||L.a!=="İETT") continue; for(const d of L.dir){ const i=d.s.indexOf(sid); if(i>=0) return {x:d,p:i}; } } return null; }
+function olcumKaydet(rows){
+  if(CITYK!=="ist") return;
+  const now=Date.now(), nm=nowMin(), toMs=t=>Math.round(now+(t-nm)*60000), out=[];
+  rows.forEach(([sid,b])=>{
+    const k=sid+"|"+b; if(OLC_T[k]&&now-OLC_T[k]<120000) return;
+    const D=dirOf(sid,b); if(!D) return;
+    const g=gpsEta(sid,b), i=liveIett(sid,b);
+    const gi=g&&g.length?toMs(g[0]):null, ii=i&&i.length?toMs(i[0]):null; if(gi==null&&ii==null) return;
+    const x=D.x, pa=STOPS[x.s[Math.max(0,D.p-1)]].p, na=STOPS[x.s[Math.min(x.s.length-1,D.p+1)]].p, me=STOPS[sid].p;
+    OLC_T[k]=now;
+    out.push({s:sid,h:b,y:x.h,la:me[0],lo:me[1],pla:pa[0],plo:pa[1],nla:na[0],nlo:na[1],t0:now,g:gi,i:ii});
+  });
+  if(out.length) try{ fetch("/api/olcum",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(out),keepalive:true}).catch(()=>{}); }catch(e){}
+}
+function liveIett(sid,b){
   const cs=liveCodes(sid); if(!cs.length) return null;
   if(!cs.some(c=>LIVE_C[c])) return null;                  // bu durak için canlı yanıt yok
   const now=nowMin();
@@ -1620,6 +1640,7 @@ async function liveRefresh(){
       const m=e.querySelector(".m"); if(m) m.innerHTML=`${items[0].dk<=0?T("Şimdi"):dk(items[0].dk)}<small class="livet">${T("canlı")}</small>`;
       e.dataset.lt=nowMin()+items[0].dk; }
   });
+  if(state.stop) olcumKaydet(els.map(e=>[e.dataset.lsid,e.dataset.lb]));
   // Durak ekranı: canlı varışa göre yeniden sırala (tarifede sabaha kalmış ama canlıda gelen araç üste çıksın)
   if(state.stop){ const box=els[0]&&els[0].parentElement; if(box){ const key=e=>+(e.dataset.lt||e.dataset.t0||1e9);
     const cur=[...box.querySelectorAll(":scope > .dep")], sorted=[...cur].sort((a,b)=>key(a)-key(b));
