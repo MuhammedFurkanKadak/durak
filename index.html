@@ -196,7 +196,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .step .tx span,.step summary{font-size:12.5px;color:var(--muted)}
 .step .wait{color:#0b8a5c!important;font-weight:600}
 .step summary{cursor:pointer}
-.step .ara{font-size:12px;color:var(--muted);padding:4px 0;line-height:1.5}
+.step .ara{list-style:none;margin:6px 0 2px;padding:0 0 0 2px}
 .step .tm{font-size:13px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .step.s-ride::before{content:"";position:absolute;left:24px;top:34px;bottom:8px;width:5px;border-radius:3px;background:var(--c)}
 .step.s-walk::before{content:"";position:absolute;left:25px;top:40px;bottom:-4px;border-left:3px dotted var(--muted)}
@@ -240,6 +240,7 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .livet::before{content:""}
 @keyframes lvp{50%{opacity:.35}}
 .loading{padding:60px 10px;text-align:center;color:var(--muted)}
+.ara li{position:relative;padding:3px 0 3px 16px;font-size:13px;color:var(--muted);line-height:1.3}.ara li::before{content:"";position:absolute;left:2px;top:50%;width:7px;height:7px;margin-top:-4px;border-radius:50%;border:2px solid currentColor;opacity:.55;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -425,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261100";
+const APP_VERSION="202611261105";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1420,7 +1421,7 @@ function openPlan(k){
         <div class="tx"><b>${T("Bin:")} ${esc(s.on)}</b><span>${yonT(esc(s.yon))} · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${FR.legs[ri].f===0?T("ücretsiz aktarma"):tl(FR.legs[ri].f,FR.legs[ri].ap)+" · "+T("tam bilet")}</span>`:""}
           <span class="lv" data-lsid="${s.x.s[s.g.from]}" data-lb="${esc(s.Ln.b)}" data-lplan="1"></span>
           <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):(isTomorrow(s.t,now)?T("Yarın {0}'de geçiyor (ilk sefer)",fmt(s.t)):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now)))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${s.g.lv==="live"?`<b class="livet">${T("canlı")}</b>`:s.g.lv==="nolive"?`<b class="lvw">⚠️ ${T("canlıda araç yok")}</b>`:T("tarifeye göre")}</span>
-          ${s.ara.length?`<details><summary>${s.ara.length+1} ${T("durak")} · ~${dk(s.dk)}</summary><div class="ara">${s.ara.map(esc).join(" · ")}</div></details>`:`<span>1 ${T("durak")} · ~${dk(s.dk)}</span>`}
+          ${s.ara.length?`<details><summary>${s.ara.length+1} ${T("durak")} · ~${dk(s.dk)}</summary><ol class="ara">${s.ara.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>`:`<span>1 ${T("durak")} · ~${dk(s.dk)}</span>`}
           <b style="margin-top:6px">${T("İn:")} ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
       <div class="step"><div class="ic"><span>🏁</span></div><div class="tx"><b>${esc(M.Bname===ME?T(ME):M.Bname)}</b><span>${T("Varış")}</span></div><div class="tm">${fmt(o.arr)}</div></div>
