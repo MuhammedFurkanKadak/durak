@@ -4,6 +4,8 @@
 //   POST /api/konum-al?tur=hat&h=26B     gövde: GetHatOtoKonum_json SOAP yanıtı
 //   GET  /api/konum-al?istek=1           sırada çekilmesi gereken hat (uygulamada son 10 dk'da bakılan, en eski güncellenen)
 // Hepsi "x-key" başlığında KONUM_KEY ister.
+// Hat yanıtlarından "kapı no -> hat/yön" eşleşmesi öğrenilir; sonra o araçlar 2 dk'da bir gelen filo
+// verisinden hat sorgusuna gerek kalmadan izlenir ("hatf"). Ölçümdeki hatların araç izleri "iz"e yazılır.
 const { pipe } = require("./_redis");
 
 const CELL_LAT = 0.003, CELL_LON = 0.004;   // ~330 m'lik hücreler
@@ -31,11 +33,16 @@ module.exports = async (req, res) => {
   try {
     if (req.method === "GET" && q.istek) {
       const now = Date.now();
-      const [lines] = await pipe([["ZRANGEBYSCORE", "istek", now - 600000, "+inf"]]);
-      if (!lines || !lines.length) return res.end("");
-      const ts = await pipe(lines.map(h => ["HGET", "hatt", h]));
-      const due = lines.map((h, i) => [h, +ts[i] || 0]).filter(x => now - x[1] > 50000).sort((a, b) => a[1] - b[1]);
-      return res.end(due.length ? due[0][0] : "");
+      const [lines, olc] = await pipe([["ZRANGEBYSCORE", "istek", now - 600000, "+inf"], ["ZRANGEBYSCORE", "olch", now - 5400000, "+inf"]]);
+      const all = [...new Set([...(lines || []), ...(olc || [])])];
+      if (!all.length) return res.end("");
+      const ts = await pipe(all.map(h => ["HGET", "hatt", h]));
+      const age = {}; all.forEach((h, i) => age[h] = now - (+ts[i] || 0));
+      // Önce uygulamada bakılan hatlar (50 sn'den eski), sonra ölçümdeki hatların eşleşme tazelemesi (20 dk)
+      const a = (lines || []).filter(h => age[h] > 50000).sort((x, y) => age[y] - age[x]);
+      if (a.length) return res.end(a[0]);
+      const b = (olc || []).filter(h => age[h] > 1200000).sort((x, y) => age[y] - age[x]);
+      return res.end(b.length ? b[0] : "");
     }
     if (req.method !== "POST") { res.statusCode = 405; return res.end(); }
     const xml = await readBody(req);
@@ -44,7 +51,9 @@ module.exports = async (req, res) => {
       const h = String(q.h || "").slice(0, 10);
       const list = soapResult(xml, "GetHatOtoKonum_json");
       const araclar = list.map(v => ({ k: v.kapino, la: +v.enlem, lo: +v.boylam, y: v.yon, g: v.guzergahkodu, d: v.yakinDurakKodu, z: v.son_konum_zamani }));
-      await pipe([["SET", "hat:" + h, JSON.stringify({ t: Date.now(), araclar }), "EX", 900], ["HSET", "hatt", h, Date.now()]]);
+      const cmds = [["SET", "hat:" + h, JSON.stringify({ t: Date.now(), araclar }), "EX", 900], ["HSET", "hatt", h, Date.now()]];
+      if (araclar.length) cmds.push(["HSET", "kapi", ...araclar.flatMap(v => [v.k, JSON.stringify({ h, y: v.y, t: Date.now() })])]);
+      await pipe(cmds);
       return res.json({ ok: true, hat: h, adet: araclar.length });
     }
 
@@ -67,8 +76,22 @@ module.exports = async (req, res) => {
         g[k] = o ? [(o[0] * o[1] + v * n) / (o[1] + n), o[1] + n] : [v, n];
       }
       for (const k of Object.keys(g)) { if (g[k][1] < 0.3) delete g[k]; else g[k] = [Math.round(g[k][0] * 10) / 10, Math.round(g[k][1] * 10) / 10]; }
-      await pipe([["SET", "hiz", JSON.stringify({ t: Date.now(), cl: CELL_LAT, co: CELL_LON, g }), "EX", 1800]]);
-      return res.json({ ok: true, arac: list.length, kullanilan: used, hucre: Object.keys(g).length });
+      // Hat eşleşmesi bilinen araçları hatlara dağıt (3 saatten eski eşleşme sayılmaz)
+      const [kapiFlat, olc] = await pipe([["HGETALL", "kapi"], ["ZRANGEBYSCORE", "olch", Date.now() - 5400000, "+inf"]]);
+      const kapi = {}; if (Array.isArray(kapiFlat)) for (let i = 0; i < kapiFlat.length; i += 2) { try { const m = JSON.parse(kapiFlat[i + 1]); if (Date.now() - m.t < 3 * 3600e3) kapi[kapiFlat[i]] = m; } catch (e) {} }
+      const ist = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
+      const hatf = {}, olcSet = new Set(olc || []), iz = [];
+      for (const v of list) {
+        const m = kapi[v.KapiNo]; if (!m || ageMin(v.Saat) > 4) continue;
+        const la = +v.Enlem, lo = +v.Boylam;
+        (hatf[m.h] || (hatf[m.h] = [])).push({ k: v.KapiNo, la, lo, y: m.y, z: ist + " " + v.Saat });
+        if (olcSet.has(m.h)) iz.push([m.h, v.KapiNo, m.y, +la.toFixed(5), +lo.toFixed(5), Date.parse(ist + "T" + v.Saat + "+03:00")]);
+      }
+      const cmds = [["SET", "hiz", JSON.stringify({ t: Date.now(), cl: CELL_LAT, co: CELL_LON, g }), "EX", 1800],
+                    ["SET", "hatf", JSON.stringify({ t: Date.now(), d: hatf }), "EX", 900]];
+      if (iz.length) cmds.push(["LPUSH", "iz", JSON.stringify({ t: Date.now(), v: iz })], ["LTRIM", "iz", 0, 1500]);
+      await pipe(cmds);
+      return res.json({ ok: true, arac: list.length, kullanilan: used, hucre: Object.keys(g).length, eslesen: Object.values(hatf).reduce((a, x) => a + x.length, 0), hat: Object.keys(hatf).length, iz: iz.length });
     }
     res.statusCode = 400; res.json({ hata: "tur=filo ya da tur=hat" });
   } catch (e) { res.statusCode = 500; res.json({ hata: String(e.message || e) }); }
