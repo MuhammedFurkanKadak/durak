@@ -76,9 +76,9 @@ module.exports = async (req, res) => {
         g[k] = o ? [(o[0] * o[1] + v * n) / (o[1] + n), o[1] + n] : [v, n];
       }
       for (const k of Object.keys(g)) { if (g[k][1] < 0.3) delete g[k]; else g[k] = [Math.round(g[k][0] * 10) / 10, Math.round(g[k][1] * 10) / 10]; }
-      // Hat eşleşmesi bilinen araçları hatlara dağıt (3 saatten eski eşleşme sayılmaz)
+      // Hat eşleşmesi bilinen araçları hatlara dağıt (6 saatten eski eşleşme sayılmaz)
       const [kapiFlat, olc] = await pipe([["HGETALL", "kapi"], ["ZRANGEBYSCORE", "olch", Date.now() - 5400000, "+inf"]]);
-      const kapi = {}; if (Array.isArray(kapiFlat)) for (let i = 0; i < kapiFlat.length; i += 2) { try { const m = JSON.parse(kapiFlat[i + 1]); if (Date.now() - m.t < 3 * 3600e3) kapi[kapiFlat[i]] = m; } catch (e) {} }
+      const kapi = {}; if (Array.isArray(kapiFlat)) for (let i = 0; i < kapiFlat.length; i += 2) { try { const m = JSON.parse(kapiFlat[i + 1]); if (Date.now() - m.t < 6 * 3600e3) kapi[kapiFlat[i]] = m; } catch (e) {} }
       const ist = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
       const hatf = {}, olcSet = new Set(olc || []), iz = [];
       for (const v of list) {
