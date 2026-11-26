@@ -33,7 +33,7 @@ try{document.documentElement.dataset.theme=localStorage.getItem("durak-tema")===
 :root.osmbase[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7)}
 :root[data-theme="dark"] .leaflet-container{background:#0e131d}
 :root[data-theme="dark"] .leaflet-bar a{background:var(--card);color:var(--ink);border-color:var(--line)}
-.leaflet-control-attribution{font-size:9px!important;line-height:1.3;padding:0 4px!important}
+.leaflet-control-attribution{font-size:9px!important;line-height:1.3;padding:0 12px 1px 6px!important;border-top-left-radius:6px}
 :root[data-theme="dark"] .leaflet-control-attribution{background:rgba(14,19,29,.75)!important;color:var(--muted)}
 :root[data-theme="dark"] .leaflet-popup-content-wrapper,:root[data-theme="dark"] .leaflet-popup-tip{background:var(--card);color:var(--ink)}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -425,7 +425,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261050";
+const APP_VERSION="202611261100";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -739,6 +739,7 @@ function fixOldNames(){
 // Altlık: OpenFreeMap vektör harita (anahtar/limit yok) — gündüz "liberty", gece "dark".
 // MapLibre ~1 MB, açılışı yavaşlatmasın diye sonradan yüklenir; o arada ve WebGL yoksa OSM karoları.
 const OSM_ATT='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const MAP_ATT='<a href="https://openfreemap.org">OpenFreeMap</a> · '+OSM_ATT;
 const ML_V="5.24.1", MLL_V="0.1.4";
 let osmLayer=null, glLayer=null, glState="", glStyle="";
 const ofmStyle=()=>"https://tiles.openfreemap.org/styles/"+(document.documentElement.dataset.theme==="dark"?"dark":"liberty");
@@ -763,7 +764,8 @@ async function setBase(){
     if(!window.maplibregl) await loadJS(`https://unpkg.com/maplibre-gl@${ML_V}/dist/maplibre-gl.js`);
     if(!L.maplibreGL) await loadJS(`https://unpkg.com/@maplibre/maplibre-gl-leaflet@${MLL_V}/dist/leaflet-maplibre-gl.js`);
     glStyle=ofmStyle();
-    glLayer=L.maplibreGL({style:glStyle,interactive:false}).addTo(map);   // atıf metnini stil kendisi ekliyor
+    // Atıf metni sabit: eklenti stilden okuduğu metni her yüklemede ayrıca ekliyor, metin değişince üst üste biniyordu
+    glLayer=L.maplibreGL({style:glStyle,interactive:false,attributionControl:{customAttribution:MAP_ATT}}).addTo(map);
     let ready=false;
     const mm=glLayer.getMaplibreMap();
     mm.on("load",()=>{ ready=true; clearTimeout(t); glState="ok"; useOSM(false); if(ofmStyle()!==glStyle){ glStyle=ofmStyle(); mm.setStyle(glStyle); } });
