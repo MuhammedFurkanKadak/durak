@@ -424,7 +424,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611260210";
+const APP_VERSION="202611261010";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1476,6 +1476,11 @@ async function liveRefresh(){
   const key=state.stop+"|"+M.sel;
   await fetchLive(all);
   if(key!==state.stop+"|"+M.sel) return;
+  // Açık güzergâh: yeni canlı veriyle saatleri/uyarıyı yeniden hesapla (ekranda "canlıda araç yok" yazıp
+  // altında canlı dakika görünmesin). Değiştiyse detayı yeniden çiz.
+  if(!state.stop&&M.sel!==null&&M.plans&&M.plans[M.sel]){ const o=M.plans[M.sel], nn=retimeLive(o);
+    const sig=p=>p.legs?p.legs.map(g=>Math.round(g.board)+(g.lv||"")).join(","):"";
+    if(nn!==o&&sig(nn)!==sig(o)){ nn.tags=o.tags; nn.alts=o.alts; M.plans[M.sel]=nn; openPlan(M.sel); return; } }
   els.forEach(e=>{
     const items=(per.get(e.dataset.lsid)||[]).flatMap(c=>LIVE_C[c]?LIVE_C[c].items:[])
       .filter(it=>it.h===e.dataset.lb&&it.dk!=null&&!it.b).sort((a,b)=>a.dk-b.dk);
