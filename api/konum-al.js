@@ -77,14 +77,19 @@ module.exports = async (req, res) => {
       }
       for (const k of Object.keys(g)) { if (g[k][1] < 0.3) delete g[k]; else g[k] = [Math.round(g[k][0] * 10) / 10, Math.round(g[k][1] * 10) / 10]; }
       // Hat eşleşmesi bilinen araçları hatlara dağıt (6 saatten eski eşleşme sayılmaz)
-      const [kapiFlat, olc] = await pipe([["HGETALL", "kapi"], ["ZRANGEBYSCORE", "olch", Date.now() - 5400000, "+inf"]]);
+      const [kapiFlat, olc, eskiS] = await pipe([["HGETALL", "kapi"], ["ZRANGEBYSCORE", "olch", Date.now() - 5400000, "+inf"], ["GET", "hatf"]]);
+      // Bir önceki filo turundaki konumlar: aracın gidiş yönünü hareketinden anlamak için (hat sorgusundaki yön
+      // bilgisi saatler önceye ait olabilir; araç son durakta dönünce eskir)
+      const once = {}; try { const e = eskiS ? JSON.parse(eskiS) : null; if (e && Date.now() - e.t < 6 * 60000) for (const arr of Object.values(e.d)) for (const v of arr) once[v.k] = v; } catch (e) {}
       const kapi = {}; if (Array.isArray(kapiFlat)) for (let i = 0; i < kapiFlat.length; i += 2) { try { const m = JSON.parse(kapiFlat[i + 1]); if (Date.now() - m.t < 6 * 3600e3) kapi[kapiFlat[i]] = m; } catch (e) {} }
       const ist = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
       const hatf = {}, olcSet = new Set(olc || []), iz = [];
       for (const v of list) {
         const m = kapi[v.KapiNo]; if (!m || ageMin(v.Saat) > 4) continue;
         const la = +v.Enlem, lo = +v.Boylam;
-        (hatf[m.h] || (hatf[m.h] = [])).push({ k: v.KapiNo, la, lo, y: m.y, z: ist + " " + v.Saat });
+        const o = once[v.KapiNo], rec = { k: v.KapiNo, la, lo, y: m.y, z: ist + " " + v.Saat };
+        if (o) { if (Math.abs(o.la - la) + Math.abs(o.lo - lo) > 0.0006) { rec.pla = o.la; rec.plo = o.lo; } else if (o.pla) { rec.pla = o.pla; rec.plo = o.plo; } }
+        (hatf[m.h] || (hatf[m.h] = [])).push(rec);
         if (olcSet.has(m.h)) iz.push([m.h, v.KapiNo, m.y, +la.toFixed(5), +lo.toFixed(5), Date.parse(ist + "T" + v.Saat + "+03:00")]);
       }
       const cmds = [["SET", "hiz", JSON.stringify({ t: Date.now(), cl: CELL_LAT, co: CELL_LON, g }), "EX", 1800],
