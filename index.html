@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611262210";
+const APP_VERSION="202611262220";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1540,7 +1540,7 @@ function olcumKaydet(rows){
   const now=Date.now(), nm=nowMin(), toMs=t=>Math.round(now+(t-nm)*60000), out=[];
   rows.forEach(([sid,b])=>{
     const k=sid+"|"+b; if(OLC_T[k]&&now-OLC_T[k]<120000) return;
-    const D=dirOf(sid,b); if(!D) return;
+    const D=dirOf(sid,b); if(!D||D.p===0) return;   // ilk durakta (kalkış noktası) varış ölçülemez: araç orada bekler
     const g=gpsEta(sid,b), i=liveIett(sid,b);
     const gi=g&&g.length?toMs(g[0]):null, ii=i&&i.length?toMs(i[0]):null; if(gi==null&&ii==null) return;
     const x=D.x, pa=STOPS[x.s[Math.max(0,D.p-1)]].p, na=STOPS[x.s[Math.min(x.s.length-1,D.p+1)]].p, me=STOPS[sid].p;
@@ -1984,7 +1984,7 @@ setInterval(()=>{ if(!app.hidden&&!document.hidden&&(!document.activeElement||do
 // Bir tarayıcı sekmesinde açık bırakmak yeter; kimsenin durak açmasına gerek kalmaz.
 function olcumModu(){
   if(!/[?&]olcum=1/.test(location.search)||CITYK!=="ist") return;
-  const cnt={}; LINES.forEach(L=>{ if(L.a!=="İETT"||L.t==="metrobus") return; L.dir.forEach(d=>d.s.forEach(sid=>{ if(DKOD[sid]) cnt[sid]=(cnt[sid]||0)+1; })); });
+  const cnt={}; LINES.forEach(L=>{ if(L.a!=="İETT"||L.t==="metrobus") return; L.dir.forEach(d=>d.s.forEach((sid,i)=>{ if(DKOD[sid]&&i>2&&i<d.s.length-2) cnt[sid]=(cnt[sid]||0)+1; })); });   // hat başı/sonu olmayan duraklar
   const top=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]).slice(0,400), pick=[];
   for(const sid of top){ if(pick.length>=12) break; if(pick.every(q=>hav(STOPS[q].p,STOPS[sid].p)>2500)) pick.push(sid); }
   let i=0; const bar=document.createElement("div");
