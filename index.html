@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261210";
+const APP_VERSION="202611261225";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1535,7 +1535,8 @@ async function liveRefresh(){
   });
   // Durak ekranı: canlı varışa göre yeniden sırala (tarifede sabaha kalmış ama canlıda gelen araç üste çıksın)
   if(state.stop){ const box=els[0]&&els[0].parentElement; if(box){ const key=e=>+(e.dataset.lt||e.dataset.t0||1e9);
-    [...box.querySelectorAll(":scope > .dep")].sort((a,b)=>key(a)-key(b)).forEach(e=>box.appendChild(e)); } }
+    const cur=[...box.querySelectorAll(":scope > .dep")], sorted=[...cur].sort((a,b)=>key(a)-key(b));
+    if(sorted.some((e,i)=>e!==cur[i])){ const sy=window.scrollY; sorted.forEach(e=>box.appendChild(e)); if(window.scrollY!==sy) window.scrollTo(0,sy); } } }
   liveTimer=setTimeout(()=>{ if(!document.hidden) liveRefresh(); },30000);
 }
 
@@ -1832,7 +1833,34 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   hist=[];go({tab:b.dataset.tab,line:null,stop:null,q:""});});
 // 30 sn'de bir sayfayı tazele ama kaydırma yerini ve durak ekranındaki canlı bilgiyi koru (sayfa en üste atmasın)
 function softRender(){
-  const sy=window.scrollY, st=app.scrollTop, keep={};
+  const sy=window.scrollY;
+  // Durak ekranı: sayfayı yeniden kurma; yalnız satır listesini tazele, canlı bilgiyi taşı, kaydırmayı koru
+  // (iPhone'da sayfa yeniden kurulunca en üste atıyordu)
+  if(state.stop&&!state.line){
+    const box=app.querySelector(".stops");
+    if(box){
+      const K=e=>e.dataset.line+":"+e.dataset.d+":"+e.dataset.lsid;
+      const tmp=document.createElement("div"); tmp.innerHTML=viewStop();
+      const nb=tmp.querySelector(".stops"), old={};
+      box.querySelectorAll(":scope > .dep").forEach(e=>old[K(e)]=e);
+      if(nb){
+        const rows=[...nb.children];
+        rows.forEach(r=>{ if(!r.classList.contains("dep")) return; const e=old[K(r)]; if(!e||!e.dataset.lt) return;
+          const lv=r.querySelector(".lv"), ol=e.querySelector(".lv"), m=r.querySelector(".m"), om=e.querySelector(".m");
+          if(lv&&ol) lv.innerHTML=ol.innerHTML; if(m&&om) m.innerHTML=om.innerHTML; r.dataset.lt=e.dataset.lt; });
+        const key=e=>+(e.dataset.lt||e.dataset.t0||1e9);
+        rows.filter(r=>r.classList.contains("dep")).sort((x,y)=>key(x)-key(y)).forEach(r=>nb.appendChild(r));
+        box.style.minHeight=box.offsetHeight+"px";
+        box.replaceChildren(...nb.childNodes);
+        if(window.scrollY!==sy) window.scrollTo(0,sy);
+        requestAnimationFrame(()=>{ box.style.minHeight=""; if(window.scrollY!==sy) window.scrollTo(0,sy); });
+        liveRefresh();
+        return;
+      }
+    }
+  }
+  const h=app.offsetHeight; app.style.minHeight=h+"px";   // yeniden kurulurken boy küçülüp kaydırma sıfırlanmasın
+  const keep={};
   if(state.stop) app.querySelectorAll(".dep").forEach(e=>{ if(!e.dataset.lt) return; const lv=e.querySelector(".lv"), m=e.querySelector(".m");
     keep[e.dataset.line+":"+e.dataset.d]={lv:lv?lv.innerHTML:"",m:m?m.innerHTML:"",lt:e.dataset.lt}; });
   render();
@@ -1840,7 +1868,7 @@ function softRender(){
       const lv=e.querySelector(".lv"), m=e.querySelector(".m"); if(lv) lv.innerHTML=o.lv; if(m) m.innerHTML=o.m; e.dataset.lt=o.lt; });
     const box=app.querySelector(".stops"); if(box){ const key=e=>+(e.dataset.lt||e.dataset.t0||1e9);
       [...box.querySelectorAll(":scope > .dep")].sort((a,b)=>key(a)-key(b)).forEach(e=>box.appendChild(e)); } }
-  app.scrollTop=st; if(window.scrollY!==sy) window.scrollTo(0,sy);
+  window.scrollTo(0,sy); requestAnimationFrame(()=>{ if(window.scrollY!==sy) window.scrollTo(0,sy); app.style.minHeight=""; });
 }
 setInterval(()=>{ if(!app.hidden&&!document.hidden&&(!document.activeElement||document.activeElement.tagName!=="INPUT")) softRender(); },30000);
 
