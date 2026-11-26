@@ -424,7 +424,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261030";
+const APP_VERSION="202611261045";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -446,7 +446,7 @@ function setTheme(t){
   const b=document.getElementById("themeb");
   if(b){ b.innerHTML=t==="dark"?SUN:MOON; b.setAttribute("aria-label",T(t==="dark"?"Gündüz moduna geç":"Gece moduna geç")); }
   const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=t==="dark"?"#0e131d":"#1f4fd8";
-  if(typeof setBase==="function") try{ setBase(); }catch(e){}
+  if(typeof setBase==="function") try{ const p=setBase(); if(p&&p.catch) p.catch(()=>{}); }catch(e){}
 }
 setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
 document.getElementById("themeb").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
@@ -735,23 +735,41 @@ function fixOldNames(){
   todo.slice(0,8).forEach((ll,i)=>setTimeout(async()=>fixSavedNames(ll,await revName(ll)),300*i));
 }
 // ================= HARİTA =================
-// Altlık: CARTO Voyager (gündüz) / Dark Matter (gece). Çok karo yüklenemezse OSM'ye düş.
+// Altlık: OpenFreeMap vektör harita (anahtar/limit yok) — gündüz "liberty", gece "dark".
+// MapLibre ~1 MB, açılışı yavaşlatmasın diye sonradan yüklenir; o arada ve WebGL yoksa OSM karoları.
 const OSM_ATT='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-let baseLayer=null, baseFail=0, baseOSM=false;
-function setBase(){
+const OFM_ATT='<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a> '+OSM_ATT;
+const ML_V="5.24.1", MLL_V="0.1.4";
+let osmLayer=null, glLayer=null, glState="", glStyle="";
+const ofmStyle=()=>"https://tiles.openfreemap.org/styles/"+(document.documentElement.dataset.theme==="dark"?"dark":"liberty");
+function loadJS(u){ return new Promise((ok,no)=>{ const e=document.createElement("script"); e.src=u; e.onload=ok; e.onerror=no; document.head.appendChild(e); }); }
+function useOSM(on){
+  if(on&&!osmLayer){ osmLayer=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:OSM_ATT}); }
+  if(on){ if(!map.hasLayer(osmLayer)){ osmLayer.addTo(map); osmLayer.bringToBack(); } }
+  else if(osmLayer&&map.hasLayer(osmLayer)) map.removeLayer(osmLayer);
+  document.documentElement.classList.toggle("osmbase",!!on);
+}
+async function setBase(){
   if(!map) return;
-  const dark=document.documentElement.dataset.theme==="dark";
-  if(baseLayer) map.removeLayer(baseLayer);
-  baseLayer=baseOSM
-    ? L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:OSM_ATT})
-    : L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${dark?"dark_all":"voyager"}/{z}/{x}/{y}{r}.png`,
-        {maxZoom:20,subdomains:"abcd",attribution:OSM_ATT+' © <a href="https://carto.com/attributions">CARTO</a>'});
-  baseFail=0; let ok=0;
-  baseLayer.on("tileload",()=>{ ok++; });
-  // Hiç karo gelmeden 8 hata: CARTO erişilemiyor demek -> OSM
-  baseLayer.on("tileerror",()=>{ if(!baseOSM&&!ok&&++baseFail>=8){ baseOSM=true; setBase(); } });
-  baseLayer.addTo(map); baseLayer.bringToBack();
-  document.documentElement.classList.toggle("osmbase",baseOSM);
+  if(glState==="ok"){ const st=ofmStyle(); if(st!==glStyle){ glStyle=st; try{ glLayer.getMaplibreMap().setStyle(st); }catch(e){} } return; }
+  if(glState==="fail"){ useOSM(true); return; }
+  if(glState==="load") return;
+  const c=document.createElement("canvas"); let gl=null; try{ gl=c.getContext("webgl2")||c.getContext("webgl"); }catch(e){}
+  if(!gl){ glState="fail"; useOSM(true); return; }
+  glState="load";
+  const t=setTimeout(()=>{ if(glState==="load") useOSM(true); },2500);   // yavaş bağlantıda boş kalmasın
+  try{
+    const css=document.createElement("link"); css.rel="stylesheet"; css.href=`https://unpkg.com/maplibre-gl@${ML_V}/dist/maplibre-gl.css`; document.head.appendChild(css);
+    if(!window.maplibregl) await loadJS(`https://unpkg.com/maplibre-gl@${ML_V}/dist/maplibre-gl.js`);
+    if(!L.maplibreGL) await loadJS(`https://unpkg.com/@maplibre/maplibre-gl-leaflet@${MLL_V}/dist/leaflet-maplibre-gl.js`);
+    glStyle=ofmStyle();
+    glLayer=L.maplibreGL({style:glStyle,attribution:OFM_ATT,interactive:false}).addTo(map);
+    let ready=false;
+    const mm=glLayer.getMaplibreMap();
+    mm.on("load",()=>{ ready=true; clearTimeout(t); glState="ok"; useOSM(false); try{ map.attributionControl.addAttribution(OFM_ATT); }catch(e){} if(ofmStyle()!==glStyle){ glStyle=ofmStyle(); mm.setStyle(glStyle); } });
+    mm.on("error",e=>{ if(!ready&&glState==="load"){ glState="fail"; try{ map.removeLayer(glLayer); }catch(_){} useOSM(true); } });
+    setTimeout(()=>{ if(!ready&&glState==="load"){ glState="fail"; try{ map.removeLayer(glLayer); }catch(_){} useOSM(true); } },15000);
+  }catch(e){ clearTimeout(t); glState="fail"; useOSM(true); }
 }
 let map, lineLayer, stopLayer, vehLayer, routeLayer, mkA, mkB, myLoc=null, locAsked=false;
 const M={A:null,B:null,Aname:"",Bname:"",Aids:null,Bids:null,plans:null,sel:null,field:"to"};

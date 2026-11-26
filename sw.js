@@ -1,5 +1,5 @@
 // Durak servis çalışanı: uygulama kabuğunu ve hat verisini telefonda saklar (internet yokken de açılır).
-const V = "durak-v4";
+const V = "durak-v5";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"];
 self.addEventListener("install", e => {
@@ -29,5 +29,5 @@ self.addEventListener("fetch", e => {
     return e.respondWith(cacheFirst(r));
   }
   if (u.hostname === "unpkg.com" || u.hostname.endsWith("gstatic.com") || u.hostname === "fonts.googleapis.com") return e.respondWith(cacheFirst(r));
-  if (u.hostname.endsWith("tile.openstreetmap.org") || u.hostname.endsWith("basemaps.cartocdn.com")) return e.respondWith(cacheFirst(r, "durak-tiles"));
+  if (u.hostname.endsWith("tile.openstreetmap.org")) return e.respondWith(cacheFirst(r, "durak-tiles"));
 });
