@@ -55,13 +55,21 @@ module.exports = async (req, res) => {
     for (const h in T) for (const k in T[h]) T[h][k].p.sort((a, b) => a.ts - b.ts);
     const kova = m => m < 5 ? "0-5 dk" : m < 10 ? "5-10 dk" : m < 20 ? "10-20 dk" : "20+ dk";
     const top = { g: {}, i: {} }, hat = {}; let olculen = 0, bekleyen = 0, kapsamDisi = 0;
+    const neden = { hat_henuz_izlenmiyordu: 0, iz_boslugu: 0, otobus_gelmedi: 0 }, gelmeyen = {};
     for (const s of olc || []) {
       const r = JSON.parse(s);
-      if (r.t0 < izIlk || !hatIlk[r.h] || r.t0 < hatIlk[r.h] + 60000) { kapsamDisi++; continue; }   // bu hat o an henüz izlenmiyordu
+      if (r.t0 < izIlk || !hatIlk[r.h] || r.t0 < hatIlk[r.h] + 60000) { kapsamDisi++; neden.hat_henuz_izlenmiyordu++; continue; }   // bu hat o an henüz izlenmiyordu
       const araclar = Object.values(T[r.h] || {}).filter(a => !a.y || !r.y || nrm(a.y) === nrm(r.y) || nrm(a.y).includes(nrm(r.y)) || nrm(r.y).includes(nrm(a.y)));
       let gercek = null; for (const a of araclar) { const t = gecis(r, a.p); if (t && (!gercek || t < gercek)) gercek = t; }
-      if (!gercek) { if (izSon - r.t0 < 45 * 60000) bekleyen++; else kapsamDisi++; continue; }
-      if (bosluk(r.t0, gercek)) { kapsamDisi++; continue; }
+      if (!gercek) {
+        if (izSon - r.t0 < 45 * 60000) { bekleyen++; continue; }
+        if (bosluk(r.t0, r.t0 + 45 * 60000)) { kapsamDisi++; neden.iz_boslugu++; continue; }
+        // İz kesintisizdi ama 45 dk içinde o yönde hiçbir otobüs durağı geçmedi: tahmin edilen araç gelmedi
+        kapsamDisi++; neden.otobus_gelmedi++;
+        const gk = (gelmeyen[r.h] || (gelmeyen[r.h] = { adet: 0, gps: 0, iett: 0 })); gk.adet++; if (r.g) gk.gps++; if (r.i) gk.iett++;
+        continue;
+      }
+      if (bosluk(r.t0, gercek)) { kapsamDisi++; neden.iz_boslugu++; continue; }
       olculen++;
       for (const src of ["g", "i"]) {
         if (!r[src]) continue;
@@ -73,7 +81,9 @@ module.exports = async (req, res) => {
     const ozet = o => Object.fromEntries(Object.entries(o).map(([k, b]) => [k, { adet: b.n, ortalama_sapma_dk: +(b.mutlak / b.n).toFixed(2), egilim_dk: +(b.isaret / b.n).toFixed(2) }]));
     res.json({
       aciklama: "sapma = |tahmin - gerçek varış|; eğilim + ise tahmin geç (araç tahminden önce geldi), - ise erken",
-      kayit: (olc || []).length, olculen, bekleyen, kapsamDisi,
+      kayit: (olc || []).length, olculen, bekleyen, kapsamDisi, kapsam_disi_nedenleri: neden,
+      izlenen_hat: Object.keys(T).length, iz_anlik: anlar.length, iz_baslangic: izIlk < Infinity ? new Date(izIlk + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null,
+      tahmin_edilip_gelmeyen: gelmeyen,
       gps_trafik: ozet(top.g), iett: ozet(top.i),
       hatlar: Object.fromEntries(Object.entries(hat).map(([h, v]) => [h, { gps: v.g.n ? +(v.g.m / v.g.n).toFixed(2) : null, gps_n: v.g.n, iett: v.i.n ? +(v.i.m / v.i.n).toFixed(2) : null, iett_n: v.i.n }])),
     });
