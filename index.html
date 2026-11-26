@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261105";
+const APP_VERSION="202611261210";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1830,7 +1830,19 @@ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   // Zaten "Nasıl Giderim"deyken tekrar basınca: rota sonuçlarından ana ekrana dön
   if(b.dataset.tab==="rota"&&state.tab==="rota"&&!state.line&&!state.stop&&(M.plans||M.B||NAV)){ if(NAV) stopNav(); goHome(); window.scrollTo(0,0); return; }
   hist=[];go({tab:b.dataset.tab,line:null,stop:null,q:""});});
-setInterval(()=>{ if(!app.hidden&&(!document.activeElement||document.activeElement.tagName!=="INPUT")) render(); },30000);
+// 30 sn'de bir sayfayı tazele ama kaydırma yerini ve durak ekranındaki canlı bilgiyi koru (sayfa en üste atmasın)
+function softRender(){
+  const sy=window.scrollY, st=app.scrollTop, keep={};
+  if(state.stop) app.querySelectorAll(".dep").forEach(e=>{ if(!e.dataset.lt) return; const lv=e.querySelector(".lv"), m=e.querySelector(".m");
+    keep[e.dataset.line+":"+e.dataset.d]={lv:lv?lv.innerHTML:"",m:m?m.innerHTML:"",lt:e.dataset.lt}; });
+  render();
+  if(state.stop){ app.querySelectorAll(".dep").forEach(e=>{ const o=keep[e.dataset.line+":"+e.dataset.d]; if(!o) return;
+      const lv=e.querySelector(".lv"), m=e.querySelector(".m"); if(lv) lv.innerHTML=o.lv; if(m) m.innerHTML=o.m; e.dataset.lt=o.lt; });
+    const box=app.querySelector(".stops"); if(box){ const key=e=>+(e.dataset.lt||e.dataset.t0||1e9);
+      [...box.querySelectorAll(":scope > .dep")].sort((a,b)=>key(a)-key(b)).forEach(e=>box.appendChild(e)); } }
+  app.scrollTop=st; if(window.scrollY!==sy) window.scrollTo(0,sy);
+}
+setInterval(()=>{ if(!app.hidden&&!document.hidden&&(!document.activeElement||document.activeElement.tagName!=="INPUT")) softRender(); },30000);
 
 loadData().then(render).catch(e=>{app.innerHTML=`<div class="empty">${T("Veri yüklenemedi:")} ${esc(e.message)}</div>`;});
 </script>
