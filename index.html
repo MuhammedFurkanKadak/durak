@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261245";
+const APP_VERSION="202611261535";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -863,6 +863,27 @@ function setEnd(which,ll,name,ids){
   else { M.plans=null; renderPlans(); if(ll) map.setView(ll,Math.max(map.getZoom(),14));
     msg(!M.A?T("Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta."):T("Nereye gideceğini yaz ya da haritada bir yere dokun.")); }
 }
+// Konumu sürekli izle: hareket ettikçe mavi nokta kayar; başlangıç "Konumum" ise o da güncellenir
+let locWatch=null, meMk=null, meAcc=null;
+function drawMe(acc){
+  if(!map||!myLoc) return;
+  if(!meMk){ meAcc=L.circle(myLoc,{radius:acc||30,color:"#1f6feb",weight:1,fillColor:"#1f6feb",fillOpacity:.12,interactive:false}).addTo(map);
+    meMk=L.circleMarker(myLoc,{radius:7,color:"#fff",weight:3,fillColor:"#1f6feb",fillOpacity:1,interactive:false}).addTo(map); }
+  else { meMk.setLatLng(myLoc); meAcc.setLatLng(myLoc).setRadius(Math.min(acc||30,300)); }
+}
+function startWatch(){
+  if(locWatch!==null||!navigator.geolocation) return;
+  try{ locWatch=navigator.geolocation.watchPosition(p=>{
+    const ll=[p.coords.latitude,p.coords.longitude]; if(hav(ll,CITY.c)>CITY.r) return;
+    if(p.coords.accuracy>150&&myLoc) return;           // kötü ölçümle zıplamasın
+    myLoc=ll; drawMe(p.coords.accuracy);
+    if(NAV||M.Aname!==ME||!M.A) return;
+    const d=hav(M.A,ll);
+    if(!M.B){ if(d>30){ M.A=ll; drawMarkers(); } return; }
+    // Rota açıkken: 250 m'den fazla ilerlediysen (ve bir güzergâhın detayına bakmıyorsan) rotayı yeni yerinden hesapla
+    if(d>250&&M.sel===null&&!document.querySelector("#detail:not([hidden])")){ M.A=ll; drawMarkers(); computePlans(); }
+  },()=>{},{enableHighAccuracy:true,maximumAge:10000,timeout:30000}); }catch(e){}
+}
 function askLocation(cb){
   if(!navigator.geolocation){ msg(T("Bu cihazda konum yok. Nereden başlayacağını yaz.")); return; }
   msg(T("Konumun alınıyor…"));
@@ -873,7 +894,7 @@ function askLocation(cb){
         const other=Object.keys(CITIES).find(k=>k!==CITYK&&hav(ll,CITIES[k].c)<CITIES[k].r);
         if(other){ msg(T("Konumun {0} içinde görünüyor; şehir değiştiriliyor…",CITIES[other].ad)); return setTimeout(()=>setCity(other),900); }
         msg(T("{0} dışında görünüyorsun. Nereden başlayacağını yaz.",CITY.ad)); return; }
-      myLoc=ll; if(!M.A||M.Aname==="📍 Konumum") setEnd("from",ll,"📍 Konumum"); if(cb) cb();
+      myLoc=ll; drawMe(p.coords.accuracy); startWatch(); if(!M.A||M.Aname==="📍 Konumum") setEnd("from",ll,"📍 Konumum"); if(cb) cb();
     },()=>msg(T("Konum izni verilmedi. Nereden başlayacağını yaz ya da haritada seç.")),{enableHighAccuracy:true,timeout:10000,maximumAge:30000});
   }catch(e){ msg(T("Konum alınamadı.")); }
 }
@@ -1054,8 +1075,13 @@ function rank(all,now,limit){
   }
   const tag=(f,label)=>{ if(!kept.length) return; const v=Math.min(...kept.map(f)); kept.filter(o=>f(o)===v).sort((a,b)=>a.mt.dur-b.mt.dur)[0].tags.push(label); };
   tag(o=>o.mt.dur,"En kısa");
-  if(kept.length>1){ tag(o=>o.mt.arr,"En erken varış"); tag(o=>o.walk?99:o.mt.legs,"En az aktarma"); tag(o=>o.mt.walk,"En az yürüme"); }
-  const tagged=kept.filter(o=>o.tags.length), rest=kept.filter(o=>!o.tags.length);
+  if(kept.length>1){ tag(o=>o.mt.arr,"En erken varış");
+    // "En az aktarma/yürüme" sadece makul sürede olana: 4 saatlik yolu "en az yürüme" diye önermesin
+    const dmin=Math.min(...kept.map(o=>o.mt.dur)), lim=o=>o.mt.dur<=dmin*1.35+15;
+    tag(o=>lim(o)?(o.walk?99:o.mt.legs):1e9,"En az aktarma"); tag(o=>lim(o)?o.mt.walk:1e9,"En az yürüme"); }
+  // Etiketsiz ve en kısanın çok üstünde süren (95 dk'lık yol varken 3-4 saatlik) seçenekleri listeye koyma
+  const dAll=kept.length?Math.min(...kept.map(o=>o.mt.dur)):0;
+  const tagged=kept.filter(o=>o.tags.length), rest=kept.filter(o=>!o.tags.length&&(o.walk||o.mt.dur<=dAll*1.6+20));
   let top=[...tagged,...rest].slice(0,5);
   if(top.length<5){
     // Liste kısa kaldıysa makul alternatiflerle doldur: en kısadan en fazla 30 dk uzun, farklı hat dizisi, en çok 1,5 km yürüme
@@ -1503,7 +1529,18 @@ async function liveAdjust(){
   const fix=list=>{ const a=list.map(o=>{ const n=retimeLive(o); if(n!==o){ n.tags=o.tags; n.alts=o.alts; } return n; });
     const bad=o=>!o.walk&&o.legs&&o.legs.some(g=>g.lv==="nolive")?1:0;
     return a.map((o,i)=>[o,i]).sort((p,q)=>bad(p[0])-bad(q[0])||p[1]-q[1]).map(p=>p[0]); };
-  M.plans=[...fix(top),...fix(more)]; if(M.direct) M.direct=M.direct.map(retimeLive).sort((a,b)=>a.legs[0].board-b.legs[0].board);
+  // Canlı veri saatleri kaydırınca etiketler eskide kalmasın ("En kısa" en uzun kartta kalıyordu): yeniden etiketle
+  const retag=list=>{ const L4=["En kısa","En erken varış","En az aktarma","En az yürüme"];
+    list.forEach(o=>{ o.mt=o.mt||metrics(o); o.tags=(o.tags||[]).filter(t=>!L4.includes(t)); });
+    const ok=list.filter(o=>!(o.legs&&o.legs.some(g=>g.lv==="nolive")));
+    const tag=(f,label)=>{ if(!ok.length) return; const v=Math.min(...ok.map(f)); ok.filter(o=>f(o)===v).sort((a,b)=>a.mt.dur-b.mt.dur)[0].tags.push(label); };
+    tag(o=>o.mt.dur,"En kısa");
+    if(ok.length>1){ tag(o=>o.mt.arr,"En erken varış");
+      const dmin=Math.min(...ok.map(o=>o.mt.dur)), lim=o=>o.mt.dur<=dmin*1.35+15;
+      tag(o=>lim(o)?(o.walk?99:o.mt.legs):1e9,"En az aktarma"); tag(o=>lim(o)?o.mt.walk:1e9,"En az yürüme"); }
+    const bad=o=>o.legs&&o.legs.some(g=>g.lv==="nolive")?1:0;
+    return list.map((o,i)=>[o,i]).sort((p,q)=>bad(p[0])-bad(q[0])||(q[0].tags.length?1:0)-(p[0].tags.length?1:0)||p[1]-q[1]).map(p=>p[0]); };
+  M.plans=[...retag(fix(top)),...fix(more)]; if(M.direct) M.direct=M.direct.map(retimeLive).sort((a,b)=>a.legs[0].board-b.legs[0].board);
   M.liveAt=Date.now(); renderPlans();
   setTimeout(()=>{ if(run===M.runId&&M.sel===null&&!document.hidden) liveAdjust(); },60000);
 }
