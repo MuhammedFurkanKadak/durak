@@ -30,7 +30,7 @@ try{document.documentElement.dataset.theme=localStorage.getItem("durak-tema")===
   --brand:#4cc2ff; --brand-ink:#06121c; --hdrbg:#0e131d; --hdrink:#eef3fb;
   color-scheme:dark;
 }
-:root[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7)}
+:root.osmbase[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.7)}
 :root[data-theme="dark"] .leaflet-container{background:#0e131d}
 :root[data-theme="dark"] .leaflet-bar a{background:var(--card);color:var(--ink);border-color:var(--line)}
 :root[data-theme="dark"] .leaflet-control-attribution{background:rgba(14,19,29,.75)!important;color:var(--muted)}
@@ -424,7 +424,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261010";
+const APP_VERSION="202611261030";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -446,6 +446,7 @@ function setTheme(t){
   const b=document.getElementById("themeb");
   if(b){ b.innerHTML=t==="dark"?SUN:MOON; b.setAttribute("aria-label",T(t==="dark"?"Gündüz moduna geç":"Gece moduna geç")); }
   const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=t==="dark"?"#0e131d":"#1f4fd8";
+  if(typeof setBase==="function") try{ setBase(); }catch(e){}
 }
 setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light");
 document.getElementById("themeb").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
@@ -734,11 +735,29 @@ function fixOldNames(){
   todo.slice(0,8).forEach((ll,i)=>setTimeout(async()=>fixSavedNames(ll,await revName(ll)),300*i));
 }
 // ================= HARİTA =================
+// Altlık: CARTO Voyager (gündüz) / Dark Matter (gece). Çok karo yüklenemezse OSM'ye düş.
+const OSM_ATT='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+let baseLayer=null, baseFail=0, baseOSM=false;
+function setBase(){
+  if(!map) return;
+  const dark=document.documentElement.dataset.theme==="dark";
+  if(baseLayer) map.removeLayer(baseLayer);
+  baseLayer=baseOSM
+    ? L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:OSM_ATT})
+    : L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${dark?"dark_all":"voyager"}/{z}/{x}/{y}{r}.png`,
+        {maxZoom:20,subdomains:"abcd",attribution:OSM_ATT+' © <a href="https://carto.com/attributions">CARTO</a>'});
+  baseFail=0; let ok=0;
+  baseLayer.on("tileload",()=>{ ok++; });
+  // Hiç karo gelmeden 8 hata: CARTO erişilemiyor demek -> OSM
+  baseLayer.on("tileerror",()=>{ if(!baseOSM&&!ok&&++baseFail>=8){ baseOSM=true; setBase(); } });
+  baseLayer.addTo(map); baseLayer.bringToBack();
+  document.documentElement.classList.toggle("osmbase",baseOSM);
+}
 let map, lineLayer, stopLayer, vehLayer, routeLayer, mkA, mkB, myLoc=null, locAsked=false;
 const M={A:null,B:null,Aname:"",Bname:"",Aids:null,Bids:null,plans:null,sel:null,field:"to"};
 function initMap(){
   map=L.map("map",{zoomControl:true,preferCanvas:true}).setView(CITY.c,CITY.z);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+  setBase();
   lineLayer=L.layerGroup().addTo(map); stopLayer=L.layerGroup(); vehLayer=L.layerGroup().addTo(map); routeLayer=L.layerGroup().addTo(map);
   // Raylı sistem ve vapur hatları (arka planda, soluk)
   LINES.forEach(Ln=>{ if(Ln.t==="minibus"||Ln.t==="dolmus"||Ln.t==="otobus") return;
