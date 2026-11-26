@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261910";
+const APP_VERSION="202611262210";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1980,7 +1980,21 @@ function softRender(){
 }
 setInterval(()=>{ if(!app.hidden&&!document.hidden&&(!document.activeElement||document.activeElement.tagName!=="INPUT")) softRender(); },30000);
 
-loadData().then(render).catch(e=>{app.innerHTML=`<div class="empty">${T("Veri yüklenemedi:")} ${esc(e.message)}</div>`;});
+// ---- Otomatik ölçüm modu (?olcum=1): yoğun durakları sırayla açar, her birinde gösterilen tahminler kaydedilir.
+// Bir tarayıcı sekmesinde açık bırakmak yeter; kimsenin durak açmasına gerek kalmaz.
+function olcumModu(){
+  if(!/[?&]olcum=1/.test(location.search)||CITYK!=="ist") return;
+  const cnt={}; LINES.forEach(L=>{ if(L.a!=="İETT"||L.t==="metrobus") return; L.dir.forEach(d=>d.s.forEach(sid=>{ if(DKOD[sid]) cnt[sid]=(cnt[sid]||0)+1; })); });
+  const top=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]).slice(0,400), pick=[];
+  for(const sid of top){ if(pick.length>=12) break; if(pick.every(q=>hav(STOPS[q].p,STOPS[sid].p)>2500)) pick.push(sid); }
+  let i=0; const bar=document.createElement("div");
+  bar.style.cssText="position:fixed;left:0;right:0;top:0;z-index:9999;background:#7c3aed;color:#fff;font:600 13px system-ui;padding:6px 10px;text-align:center";
+  document.body.appendChild(bar);
+  const step=()=>{ const sid=pick[i%pick.length]; i++; state.tab="duraklar"; go({stop:STOPS[sid].n,line:null});
+    bar.textContent=`Ölçüm modu · ${i}. açılış · ${STOPS[sid].n} · ${pick.length} durak sırayla · ${new Date().toLocaleTimeString("tr")}`; };
+  step(); setInterval(step,45000);
+}
+loadData().then(()=>{ render(); olcumModu(); }).catch(e=>{app.innerHTML=`<div class="empty">${T("Veri yüklenemedi:")} ${esc(e.message)}</div>`;});
 </script>
 </body>
 </html>
