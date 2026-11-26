@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611262220";
+const APP_VERSION="202611270105";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1512,10 +1512,16 @@ function gpsEta(sid,b){
   const nowM=nowMin(), H=nrm(x.h), out=[];
   for(const v of G.v.araclar){
     if(!v.la||!v.lo) continue;
-    const Y=nrm(v.y); if(Y&&H&&Y!==H&&!Y.includes(H)&&!H.includes(Y)) continue;     // ters yöndeki araç
     const pos=[v.la,v.lo]; let k=-1,bd=1e9;
     for(let i=0;i<x.s.length;i++){ const d=hav(pos,STOPS[x.s[i]].p); if(d<bd){ bd=d; k=i; } }
     if(bd>400) continue;                                                              // güzergâhta değil
+    // Yön: araç bir önceki konumuna göre bu yönün durak sırasında ilerliyorsa bu yönde, geriliyorsa ters yönde.
+    // Hareket bilinmiyorsa hat sorgusundaki yön adına bak (o bilgi araç son durakta dönünce eskiyebilir).
+    let yonOk=null;
+    if(v.pla){ let kp=-1,bp=1e9; for(let i=0;i<x.s.length;i++){ const d=hav([v.pla,v.plo],STOPS[x.s[i]].p); if(d<bp){ bp=d; kp=i; } }
+      if(bp<=400&&kp!==k) yonOk=k>kp; else if(bp<=400&&hav([v.pla,v.plo],pos)>60){ const nx=STOPS[x.s[Math.min(k+1,x.s.length-1)]].p; yonOk=hav(pos,nx)<hav([v.pla,v.plo],nx); } }
+    if(yonOk===false) continue;
+    if(yonOk===null){ const Y=nrm(v.y); if(Y&&H&&Y!==H&&!Y.includes(H)&&!H.includes(Y)) continue; }   // ters yöndeki araç
     let next=k; if(k<x.s.length-1){ const A=STOPS[x.s[k]].p,B=STOPS[x.s[k+1]].p; if(hav(pos,B)<hav(A,B)) next=k+1; }
     if(next>p) continue;                                                              // durağı geçmiş
     if(next===0&&bd<150) continue;                                                    // ilk durakta kalkış bekliyor: saati tarifeden
