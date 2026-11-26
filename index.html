@@ -426,7 +426,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611261535";
+const APP_VERSION="202611261800";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1482,7 +1482,54 @@ async function fetchLive(codes){
 //  • tarifeye göre 25 dk içinde gelmesi gereken araç canlıda yoksa: lv="nolive" (uyarı, liste sonuna)
 //  • canlı veri alınamazsa (aracı çalışmıyor, metro vb.) tarifeye göre kalır
 const LIVE_H=40; // canlı listesine güvenilen ufuk (dk)
+// ================= GPS + TRAFİK TAHMİNİ =================
+// İBB araç konumları (Mac'teki toplayıcı -> /api/konum) ve otobüslerin son dakikalardaki hızlarından
+// "araç şu an nerede, yol ne kadar akıyor" hesabıyla varış tahmini. Veri yoksa İETT'nin dakikası kullanılır.
+const GPS_C={}; let HIZ=null, HIZ_AT=0, IETT_B=null;
+async function gpsFetch(lines){
+  if(CITYK!=="ist") return;
+  if(!IETT_B){ IETT_B=new Set(); LINES.forEach(L=>{ if(L.a==="İETT"&&L.t!=="metrobus") IETT_B.add(L.b); }); }
+  const now=Date.now(), need=[...new Set(lines)].filter(h=>IETT_B.has(h)&&(!GPS_C[h]||now-GPS_C[h].at>20000)).slice(0,8), jobs=[];
+  if(need.length) jobs.push(fetch("/api/konum?hat="+encodeURIComponent(need.join(",")),{cache:"no-store"}).then(r=>r.ok?r.json():null)
+    .then(j=>{ if(j&&j.d) need.forEach(h=>GPS_C[h]={at:Date.now(),v:j.d[h]}); }).catch(()=>{}));
+  if(now-HIZ_AT>60000){ HIZ_AT=now; jobs.push(fetch("/api/konum?hiz=1").then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.g) HIZ=j; }).catch(()=>{})); }
+  await Promise.all(jobs);
+}
+// Konumdaki ortalama otobüs hızı (km/sa): kendi hücresi, yetmezse komşu hücreler
+function cellSpeed(p){
+  if(!HIZ||Date.now()-HIZ.t>12*60000) return null;
+  const a=Math.floor(p[0]/HIZ.cl), b=Math.floor(p[1]/HIZ.co), c=HIZ.g[a+":"+b];
+  if(c&&c[1]>=2) return c[0];
+  let sw=0,sv=0; for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){ const q=HIZ.g[(a+i)+":"+(b+j)]; if(q){ sv+=q[0]*q[1]; sw+=q[1]; } }
+  return sw>=3?sv/sw:null;
+}
+const nrm=t=>String(t||"").toLocaleUpperCase("tr").replace(/[^A-ZÇĞİÖŞÜ0-9]/g,"");
+function gpsEta(sid,b){
+  const G=GPS_C[b]; if(!G||!G.v||!G.v.araclar||!G.v.araclar.length||Date.now()-G.v.t>4*60000) return null;
+  let x=null,p=-1;
+  for(const L of LINES){ if(L.b!==b||L.a!=="İETT") continue; for(const d of L.dir){ const i=d.s.indexOf(sid); if(i>=0){ x=d; p=i; break; } } if(x) break; }
+  if(!x) return null;
+  const nowM=nowMin(), H=nrm(x.h), out=[];
+  for(const v of G.v.araclar){
+    if(!v.la||!v.lo) continue;
+    const Y=nrm(v.y); if(Y&&H&&Y!==H&&!Y.includes(H)&&!H.includes(Y)) continue;     // ters yöndeki araç
+    const pos=[v.la,v.lo]; let k=-1,bd=1e9;
+    for(let i=0;i<x.s.length;i++){ const d=hav(pos,STOPS[x.s[i]].p); if(d<bd){ bd=d; k=i; } }
+    if(bd>400) continue;                                                              // güzergâhta değil
+    let next=k; if(k<x.s.length-1){ const A=STOPS[x.s[k]].p,B=STOPS[x.s[k+1]].p; if(hav(pos,B)<hav(A,B)) next=k+1; }
+    if(next>p) continue;                                                              // durağı geçmiş
+    if(next===0&&bd<150) continue;                                                    // ilk durakta kalkış bekliyor: saati tarifeden
+    let min=0, prev=pos;
+    for(let i=next;i<=p;i++){ const q=STOPS[x.s[i]].p, d=hav(prev,q)*1.2, sp=cellSpeed([(prev[0]+q[0])/2,(prev[1]+q[1])/2]);
+      min+= sp!=null ? d/1000/Math.max(7,Math.min(45,sp))*60 : (i>next ? x.o[i]-x.o[i-1] : d/1000/18*60); prev=q; }
+    const age=v.z?Math.max(0,(Date.now()-Date.parse(v.z.replace(" ","T")+"+03:00"))/60000):0;
+    out.push(nowM+Math.max(0,min-Math.min(age,3)));
+  }
+  if(!out.length) return null;
+  out.sort((a,b)=>a-b); out.gps=true; return out;
+}
 function liveFor(sid,b){
+  const g=gpsEta(sid,b); if(g){ g.planned=false; return g; }
   const cs=liveCodes(sid); if(!cs.length) return null;
   if(!cs.some(c=>LIVE_C[c])) return null;                  // bu durak için canlı yanıt yok
   const now=nowMin();
@@ -1523,7 +1570,7 @@ async function liveAdjust(){
   const run=M.runId, now=nowMin(), codes=[];
   [...M.plans,...(M.direct||[])].forEach(o=>{ if(o.walk||!o.legs) return; o.legs.forEach(g=>{ const Ln=LINES[g.li]; if((Ln.a==="İETT"||Ln.t==="minibus")&&g.board-now<=LIVE_H+30) codes.push(...liveCodes(Ln.dir[g.di].s[g.from])); }); });
   if(!codes.length) return;
-  await fetchLive(codes);
+  await Promise.all([fetchLive(codes), gpsFetch([...M.plans,...(M.direct||[])].flatMap(o=>o.legs?o.legs.map(g=>LINES[g.li].b):[]))]);
   if(run!==M.runId||M.sel!==null||!M.plans) return;
   const top=M.plans.slice(0,M.topCount), more=M.plans.slice(M.topCount);
   const fix=list=>{ const a=list.map(o=>{ const n=retimeLive(o); if(n!==o){ n.tags=o.tags; n.alts=o.alts; } return n; });
@@ -1554,7 +1601,7 @@ async function liveRefresh(){
   const per=new Map(); els.forEach(e=>{ if(!per.has(e.dataset.lsid)) per.set(e.dataset.lsid,liveCodes(e.dataset.lsid)); });
   const all=[...new Set([...per.values()].flat())]; if(!all.length) return;
   const key=state.stop+"|"+M.sel;
-  await fetchLive(all);
+  await Promise.all([fetchLive(all), gpsFetch(els.map(e=>e.dataset.lb))]);
   if(key!==state.stop+"|"+M.sel) return;
   // Açık güzergâh: yeni canlı veriyle saatleri/uyarıyı yeniden hesapla (ekranda "canlıda araç yok" yazıp
   // altında canlı dakika görünmesin). Değiştiyse detayı yeniden çiz.
@@ -1562,11 +1609,12 @@ async function liveRefresh(){
     const sig=p=>p.legs?p.legs.map(g=>Math.round(g.board)+(g.lv||"")).join(","):"";
     if(nn!==o&&sig(nn)!==sig(o)){ nn.tags=o.tags; nn.alts=o.alts; M.plans[M.sel]=nn; openPlan(M.sel); return; } }
   els.forEach(e=>{
-    const items=(per.get(e.dataset.lsid)||[]).flatMap(c=>LIVE_C[c]?LIVE_C[c].items:[])
-      .filter(it=>it.h===e.dataset.lb&&it.dk!=null&&!it.b).sort((a,b)=>a.dk-b.dk);
+    const lt=liveFor(e.dataset.lsid,e.dataset.lb), nm0=nowMin();
+    const items=(lt||[]).map(t=>({dk:Math.max(0,Math.round(t-nm0))}));
     const lvEl=e.classList.contains("lv")?e:e.querySelector(".lv"); if(!lvEl) return;
     if(!items.length){ lvEl.innerHTML=""; delete e.dataset.lt; return; }
     const mins=items.slice(0,3).map(it=>it.dk<=0?T("şimdi"):it.dk+DK());
+    if(lt&&lt.gps) e.dataset.gps=1; else delete e.dataset.gps;
     if(e.dataset.lplan) lvEl.innerHTML=`<i class="ld"></i>${T("Canlı: araç {0} sonra durakta",items[0].dk<=0?T("şimdi"):dk(items[0].dk))}${items.length>1?` · ${T("sonraki")} ${mins.slice(1).join(", ")}`:""}`;
     else { lvEl.innerHTML=`<i class="ld"></i>${T("Canlı")}: ${mins.join(", ")}`;
       const m=e.querySelector(".m"); if(m) m.innerHTML=`${items[0].dk<=0?T("Şimdi"):dk(items[0].dk)}<small class="livet">${T("canlı")}</small>`;
