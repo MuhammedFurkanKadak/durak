@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271810";
+const APP_VERSION="202611271900";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1659,7 +1659,9 @@ function retimeLive(o){
     const earliest=i===0?now:prevEnd+tw;
     let board=g.board, lv=null, kt=null;
     const isIETT=Ln.a==="İETT"||Ln.t==="minibus";
-    const lt=isIETT&&board-now<=LIVE_H?liveFor(sid,Ln.b):null;
+    // Canlıda tarifedeki seferden önce gelen araç varsa (tarife eksik/eski olabilir) onu kullan: tarifedeki
+    // sefer ne kadar uzakta olursa olsun canlıya bak.
+    const lt=isIETT?liveFor(sid,Ln.b):null;
     if(lt){
       const a=lt.find(t=>t>=earliest-0.5);
       if(a!==undefined){ board=a; lv="live"; }
@@ -1680,7 +1682,7 @@ function retimeLive(o){
 async function liveAdjust(){
   if(CITYK!=="ist"||!M.plans||!M.plans.length) return;
   const run=M.runId, now=nowMin(), codes=[];
-  [...M.plans,...(M.direct||[])].forEach(o=>{ if(o.walk||!o.legs) return; o.legs.forEach(g=>{ const Ln=LINES[g.li]; if((Ln.a==="İETT"||Ln.t==="minibus")&&g.board-now<=LIVE_H+30) codes.push(...liveCodes(Ln.dir[g.di].s[g.from])); }); });
+  [...M.plans,...(M.direct||[])].forEach(o=>{ if(o.walk||!o.legs) return; o.legs.forEach((g,i)=>{ const Ln=LINES[g.li]; if((Ln.a==="İETT"||Ln.t==="minibus")&&(i===0||g.board-now<=LIVE_H+30)) codes.push(...liveCodes(Ln.dir[g.di].s[g.from])); }); });
   if(!codes.length) return;
   await Promise.all([fetchLive(codes), gpsFetch([...M.plans,...(M.direct||[])].flatMap(o=>o.legs?o.legs.map(g=>LINES[g.li].b):[]))]);
   if(run!==M.runId||M.sel!==null||!M.plans) return;
