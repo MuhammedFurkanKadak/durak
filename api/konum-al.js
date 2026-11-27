@@ -90,7 +90,7 @@ module.exports = async (req, res) => {
         const la = +v.Enlem, lo = +v.Boylam;
         const o = once[v.KapiNo], rec = { k: v.KapiNo, la, lo, y: m.y, z: ist + " " + v.Saat, s: +v.Hiz || 0 };
         // hm: aracın en son yer değiştirdiği an (uzun süredir duran araç seferde değildir: garaj, son durak, mola)
-        if (o) { if (Math.abs(o.la - la) + Math.abs(o.lo - lo) > 0.0006) { rec.pla = o.la; rec.plo = o.lo; rec.hm = Date.now(); }
+        if (o) { if (Math.abs(o.la - la) + Math.abs(o.lo - lo) > 0.002) { /* ~200 m: hat başında/mola yerinde dolanması hareket sayılmasın */ rec.pla = o.la; rec.plo = o.lo; rec.hm = Date.now(); }
                  else { if (o.pla) { rec.pla = o.pla; rec.plo = o.plo; } rec.hm = o.hm || 0; } }
         else rec.hm = rec.s > 3 ? Date.now() : 0;
         (hatf[m.h] || (hatf[m.h] = [])).push(rec);
