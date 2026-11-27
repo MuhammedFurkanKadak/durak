@@ -67,7 +67,8 @@ module.exports = async (req, res) => {
       return res.json({ ok: true, z, parca: Object.keys(m).length });
     }
     // Anlık UYM trafiği: /web/api/TrafficData/v4/SegmentData  {Data:[{S,V,C}]}  C: 1 akıcı … 5 tıkalı, V km/sa.
-    // Hücre başına en kötü (en yüksek) yoğunluk ve o parçaların ortalama hızı -> "uym"
+    // Hücre başına parçaların ortalama yoğunluğu ve hızı -> "uym" (en kötüsünü almak yan sokak/karşı yön
+    // yüzünden ana yolu olduğundan sıkışık gösteriyordu)
     if (q.tur === "uym") {
       const j = JSON.parse(xml), data = (j && j.Data) || [];
       const [geoAll] = await pipe([["HGETALL", "uymgeo"]]);
@@ -75,9 +76,9 @@ module.exports = async (req, res) => {
       const per = {}; let eslesen = 0;
       for (const d of data) {
         const cs = geo[d.S]; if (!cs || !(d.C >= 1)) continue; eslesen++;
-        for (const k of cs) { const o = per[k] || (per[k] = [0, 0, 0]); o[0] += d.V; o[1]++; o[2] = Math.max(o[2], d.C); }
+        for (const k of cs) { const o = per[k] || (per[k] = [0, 0, 0]); o[0] += d.V; o[1]++; o[2] += d.C; }
       }
-      const g = {}; for (const [k, [v, n, c]] of Object.entries(per)) g[k] = [Math.round(v / n), c];
+      const g = {}; for (const [k, [v, n, c]] of Object.entries(per)) g[k] = [Math.round(v / n), Math.round(c / n * 10) / 10];
       await pipe([["SET", "uym", JSON.stringify({ t: Date.now(), g }), "EX", 900]]);
       return res.json({ ok: true, veri: data.length, eslesen, hucre: Object.keys(g).length, sekil: Object.keys(geo).length });
     }
