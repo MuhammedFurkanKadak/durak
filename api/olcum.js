@@ -44,7 +44,18 @@ module.exports = async (req, res) => {
       return res.json({ ok: true, n: ok.length });
     }
     if (!req.query || !req.query.rapor) { res.statusCode = 400; return res.json({ hata: "rapor=1" }); }
-    const [olc, izs] = await pipe([["LRANGE", "olcum", 0, -1], ["LRANGE", "iz", 0, -1]]);
+    // İz listesi büyüdü (her anlık ~30–40 KB): tek LRANGE Upstash'in yanıt sınırını aşıp boş dönüyordu.
+    // Sayfa sayfa oku (yeniden eskiye); rapor başlangıcından 90 dk öncesine inince dur.
+    const basQ = req.query.bas ? Date.parse(String(req.query.bas) + "+03:00") : 0;
+    const [olc] = await pipe([["LRANGE", "olcum", 0, -1]]);
+    const izs = [], SAY = 60; let izHata = null;
+    for (let i = 0; i < 1600; i += SAY) {
+      const [p] = await pipe([["LRANGE", "iz", i, i + SAY - 1]]);
+      if (!Array.isArray(p)) { izHata = "iz okunamadı (sayfa " + i + ")"; break; }
+      if (!p.length) break;
+      izs.push(...p);
+      try { if (basQ && JSON.parse(p[p.length - 1]).t < basQ - 90 * 60000) break; } catch (e) {}
+    }
     // İzleri hat -> araç -> zaman sıralı noktalar
     const T = {}, hatIlk = {}, anlar = []; let izSon = 0, izIlk = Infinity;
     for (const s of izs || []) { const z = JSON.parse(s); izSon = Math.max(izSon, z.t); izIlk = Math.min(izIlk, z.t); anlar.push(z.t);
@@ -54,7 +65,7 @@ module.exports = async (req, res) => {
     const bosluk = (a, b) => { let prev = null; for (const t of anlar) { if (t < a - 360000) continue; if (prev != null && t - prev > 360000) return true; prev = t; if (t > b) break; } return prev == null || prev < b; };
     for (const h in T) for (const k in T[h]) T[h][k].p.sort((a, b) => a.ts - b.ts);
     const kova = m => m < 5 ? "0-5 dk" : m < 10 ? "5-10 dk" : m < 20 ? "10-20 dk" : "20+ dk";
-    const top = { g: {}, i: {}, h2: {} }, hat = {}; let olculen = 0, bekleyen = 0, kapsamDisi = 0;
+    const top = { g: {}, i: {}, h2: {}, av: {} }, hat = {}; let olculen = 0, bekleyen = 0, kapsamDisi = 0;
     const neden = { hat_henuz_izlenmiyordu: 0, iz_boslugu: 0, otobus_gelmedi: 0 }, gelmeyen = {};
     // ?bas=2026-11-27T11:20 gibi: yalnız bu andan (İstanbul saati) sonraki tahminler
     const bas = req.query.bas ? Date.parse(String(req.query.bas) + "+03:00") : 0;
@@ -75,22 +86,24 @@ module.exports = async (req, res) => {
       if (bosluk(r.t0, gercek)) { kapsamDisi++; neden.iz_boslugu++; continue; }
       olculen++;
       r.h2 = r.i || r.g;   // hibrit: İETT tahmini varsa o, yoksa GPS
-      for (const src of ["g", "i", "h2"]) {
+      r.av = r.i && r.g ? (r.i + r.g) / 2 : (r.i || r.g);   // ikisi varsa ortalaması
+      for (const src of ["g", "i", "h2", "av"]) {
         if (!r[src]) continue;
         const hata = (r[src] - gercek) / 60000, uf = (gercek - r.t0) / 60000, kv = kova(uf);
         const b = top[src][kv] || (top[src][kv] = { n: 0, mutlak: 0, isaret: 0, iki: 0 }); b.n++; b.mutlak += Math.abs(hata); b.isaret += hata; if (Math.abs(hata) <= 2) b.iki++;
-        if (src !== "h2") { const hb = (hat[r.h] || (hat[r.h] = { g: { n: 0, m: 0 }, i: { n: 0, m: 0 } }))[src]; hb.n++; hb.m += Math.abs(hata); }
+        if (src === "g" || src === "i") { const hb = (hat[r.h] || (hat[r.h] = { g: { n: 0, m: 0 }, i: { n: 0, m: 0 } }))[src]; hb.n++; hb.m += Math.abs(hata); }
       }
     }
     const ozet = o => Object.fromEntries(Object.entries(o).map(([k, b]) => [k, { adet: b.n, iki_dk_icinde_yuzde: Math.round(100 * b.iki / b.n), ortalama_sapma_dk: +(b.mutlak / b.n).toFixed(2), egilim_dk: +(b.isaret / b.n).toFixed(2) }]));
     res.json({
       aciklama: "iki_dk_icinde_yuzde = tahminin gerçek varışa ±2 dk içinde tuttuğu kayıtların oranı (hedef bu); sapma = |tahmin - gerçek varış|; eğilim + ise tahmin geç (araç tahminden önce geldi), - ise erken",
       kayit: (olc || []).length, olculen, bekleyen, kapsamDisi, kapsam_disi_nedenleri: neden,
-      izlenen_hat: Object.keys(T).length, iz_anlik: anlar.length, iz_baslangic: izIlk < Infinity ? new Date(izIlk + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null,
+      izlenen_hat: Object.keys(T).length, iz_hata: izHata, iz_anlik: anlar.length, iz_baslangic: izIlk < Infinity ? new Date(izIlk + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null,
       tahmin_edilip_gelmeyen: gelmeyen,
       bas: bas ? new Date(bas + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null,
-      gps_trafik: ozet(top.g), iett: ozet(top.i), hibrit_iett_yoksa_gps: ozet(top.h2),
+      gps_trafik: ozet(top.g), iett: ozet(top.i), hibrit_iett_yoksa_gps: ozet(top.h2), ortalama_iett_gps: ozet(top.av),
       hatlar: Object.fromEntries(Object.entries(hat).map(([h, v]) => [h, { gps: v.g.n ? +(v.g.m / v.g.n).toFixed(2) : null, gps_n: v.g.n, iett: v.i.n ? +(v.i.m / v.i.n).toFixed(2) : null, iett_n: v.i.n }])),
     });
   } catch (e) { res.statusCode = 500; res.json({ hata: String(e.message || e) }); }
 };
+module.exports.config = { maxDuration: 60 };
