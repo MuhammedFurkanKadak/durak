@@ -21,6 +21,8 @@ function soapResult(xml, method) {
   if (!m) { const f = xml.match(/<faultstring>([\s\S]*?)<\/faultstring>/); throw new Error(f ? f[1] : "SOAP yanıtı yok"); }
   return JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
 }
+// a'dan b'ye gidiş yönü, derece (kuzey 0, doğu 90)
+function yonAci(a, b) { const d = Math.atan2((b[1] - a[1]) * Math.cos(a[0] * Math.PI / 180), b[0] - a[0]) * 180 / Math.PI; return (d + 360) % 360; }
 // İstanbul saatine göre "HH:MM:SS" kaç dakika önce
 function ageMin(hms) {
   const p = String(hms || "").split(":").map(Number); if (p.length < 2) return 99;
@@ -50,36 +52,40 @@ module.exports = async (req, res) => {
     const xml = await readBody(req);
 
     // İBB Trafik (UYM) yol parçası şekilleri: /web/api/TrafficData/v3/Segments/{1..5} (yol sınıfları).
-    // Her parçanın geçtiği ~330 m hücreleri bir kez hesaplanıp saklanır ("uymgeo").
+    // UYM'de her yön ayrı parçadır (gidiş S, dönüş çoğunlukla S+10000) ve şekil gidiş yönünde sıralıdır.
+    // Her parçanın geçtiği ~330 m hücreler, o hücredeki gidiş yönüyle (10°'lik birim) birlikte saklanır:
+    // böylece karşı şeritteki trafik asla bu yöne karışmaz.
     if (q.tur === "uymgeo") {
       const z = String(q.z || "").slice(0, 2), segs = JSON.parse(xml), m = {};
       for (const sg of segs) {
         let pts; try { pts = typeof sg.G === "string" ? JSON.parse(sg.G) : sg.G; } catch (e) { continue; }
-        if (!Array.isArray(pts) || !pts.length) continue;
-        const cs = new Set();
-        for (let i = 0; i < pts.length; i++) {
-          const a = pts[i], b = pts[i + 1] || a; const n = Math.max(1, Math.ceil((Math.abs(b[0] - a[0]) / CELL_LAT + Math.abs(b[1] - a[1]) / CELL_LON) * 3));
-          for (let j = 0; j <= n; j++) cs.add(cell(a[0] + (b[0] - a[0]) * j / n, a[1] + (b[1] - a[1]) * j / n));
+        if (!Array.isArray(pts) || pts.length < 2) continue;
+        const cs = new Map();
+        for (let i = 0; i < pts.length - 1; i++) {
+          const a = pts[i], b = pts[i + 1];
+          if (Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]) < 1e-6) continue;
+          const yon = Math.round(yonAci(a, b) / 10) % 36;
+          const n = Math.max(1, Math.ceil((Math.abs(b[0] - a[0]) / CELL_LAT + Math.abs(b[1] - a[1]) / CELL_LON) * 3));
+          for (let j = 0; j <= n; j++) { const k = cell(a[0] + (b[0] - a[0]) * j / n, a[1] + (b[1] - a[1]) * j / n); if (!cs.has(k + "|" + yon)) cs.set(k + "|" + yon, [k, yon]); }
         }
-        m[sg.S] = [...cs];
+        m[sg.S] = [...cs.values()];
       }
-      await pipe([["HSET", "uymgeo", "z" + z, JSON.stringify(m)]]);
+      await pipe([["HSET", "uymgeo2", "z" + z, JSON.stringify(m)]]);
       return res.json({ ok: true, z, parca: Object.keys(m).length });
     }
     // Anlık UYM trafiği: /web/api/TrafficData/v4/SegmentData  {Data:[{S,V,C}]}  C: 1 akıcı … 5 tıkalı, V km/sa.
-    // Hücre başına parçaların ortalama yoğunluğu ve hızı -> "uym" (en kötüsünü almak yan sokak/karşı yön
-    // yüzünden ana yolu olduğundan sıkışık gösteriyordu)
+    // Hücre ve gidiş yönü başına ortalama yoğunluk ve hız -> "uym": {hücre: [[yön/10, yoğunluk, km/sa], …]}
     if (q.tur === "uym") {
       const j = JSON.parse(xml), data = (j && j.Data) || [];
-      const [geoAll] = await pipe([["HGETALL", "uymgeo"]]);
+      const [geoAll] = await pipe([["HGETALL", "uymgeo2"]]);
       const geo = {}; if (Array.isArray(geoAll)) for (let i = 1; i < geoAll.length; i += 2) { try { Object.assign(geo, JSON.parse(geoAll[i])); } catch (e) {} }
       const per = {}; let eslesen = 0;
       for (const d of data) {
         const cs = geo[d.S]; if (!cs || !(d.C >= 1)) continue; eslesen++;
-        for (const k of cs) { const o = per[k] || (per[k] = [0, 0, 0]); o[0] += d.V; o[1]++; o[2] += d.C; }
+        for (const [k, yon] of cs) { const c = per[k] || (per[k] = {}); const o = c[yon] || (c[yon] = [0, 0, 0]); o[0] += d.C; o[1] += d.V; o[2]++; }
       }
-      const g = {}; for (const [k, [v, n, c]] of Object.entries(per)) g[k] = [Math.round(v / n), Math.round(c / n * 10) / 10];
-      await pipe([["SET", "uym", JSON.stringify({ t: Date.now(), g }), "EX", 900]]);
+      const g = {}; for (const [k, c] of Object.entries(per)) g[k] = Object.entries(c).map(([y, [cs, vs, n]]) => [+y, Math.round(cs / n * 10) / 10, Math.round(vs / n)]);
+      await pipe([["SET", "uym", JSON.stringify({ t: Date.now(), v: 2, g }), "EX", 900]]);
       return res.json({ ok: true, veri: data.length, eslesen, hucre: Object.keys(g).length, sekil: Object.keys(geo).length });
     }
 
