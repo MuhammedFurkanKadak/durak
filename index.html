@@ -357,7 +357,7 @@ const EN={
 "Havalimanı":"Airport","İstanbul Havalimanı":"Istanbul Airport","Sabiha Gökçen":"Sabiha Gökçen",
 "Havalimanındasın: şehirde nereye gideceğini yaz.":"You're at the airport: type where you're going in the city.",
 "Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.":"Airport coaches (IST: Havaist, SAW: Havabüs) have their own fares and aren't shown in these routes.",
-"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı konum":"live position","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
+"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı konum":"live position","{0} aracı erken geçiyor, yetişemezsin; sonraki gösteriliyor":"{0} passes early, you can't make it; showing the next one","canlıda {0}'de geçen araca yetişemezsin, bu sonraki sefer":"you can't catch the one passing at {0} (live); this is the next trip","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
 };
 function T(s,...a){ let r=(LANG==="en"&&EN[s]!==undefined)?EN[s]:s; a.forEach((v,i)=>{ r=r.split("{"+i+"}").join(v); }); return r; }
 const yonT=y=>LANG==="en"?"to "+y:y+" yönü";
@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271345";
+const APP_VERSION="202611271810";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1654,8 +1654,10 @@ function retimeLive(o){
   for(let i=0;i<o.legs.length;i++){
     const g=o.legs[i], Ln=LINES[g.li], x=Ln.dir[g.di], sid=x.s[g.from];
     const tw=i===0?(o.w1?o.w1.w:0):walkMin(hav(STOPS[prevOff].p,STOPS[sid].p)*1.0);
-    const earliest=i===0?now+tw:prevEnd+tw;
-    let board=g.board, lv=null;
+    // İlk binişte durağa gelecek ilk araç gösterilir (yürüyerek yetişip yetişemeyeceğin kullanıcıya kalmış);
+    // aktarmalarda önceki araçtan inip yürüdükten sonraki ilk araç.
+    const earliest=i===0?now:prevEnd+tw;
+    let board=g.board, lv=null, kt=null;
     const isIETT=Ln.a==="İETT"||Ln.t==="minibus";
     const lt=isIETT&&board-now<=LIVE_H?liveFor(sid,Ln.b):null;
     if(lt){
@@ -1669,7 +1671,7 @@ function retimeLive(o){
     }
     if(i>0&&board<earliest-0.5){ const nb=nextAt(x,g.from,earliest)[0]; if(nb!==undefined){ board=nb; if(lv==="live") lv=null; } }
     if(Math.abs(board-g.board)>0.4||lv) changed=true;
-    legs.push({...g,board,lv});
+    legs.push({...g,board,lv,kt});
     prevEnd=board+(x.o[g.to]-x.o[g.from]); prevOff=x.s[g.to];
   }
   if(!changed) return o;
