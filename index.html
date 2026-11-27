@@ -357,7 +357,7 @@ const EN={
 "Havalimanı":"Airport","İstanbul Havalimanı":"Istanbul Airport","Sabiha Gökçen":"Sabiha Gökçen",
 "Havalimanındasın: şehirde nereye gideceğini yaz.":"You're at the airport: type where you're going in the city.",
 "Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.":"Airport coaches (IST: Havaist, SAW: Havabüs) have their own fares and aren't shown in these routes.",
-"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
+"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı konum":"live position","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
 };
 function T(s,...a){ let r=(LANG==="en"&&EN[s]!==undefined)?EN[s]:s; a.forEach((v,i)=>{ r=r.split("{"+i+"}").join(v); }); return r; }
 const yonT=y=>LANG==="en"?"to "+y:y+" yönü";
@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271325";
+const APP_VERSION="202611271345";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -823,13 +823,19 @@ function drawVehicles(){
   if(sel){
     (sel.legs||[]).forEach(g=>{
       const Ln=LINES[g.li], x=Ln.dir[g.di], start=g.board-x.o[g.from], e=now-start;
-      if(e<0||e>x.o[g.to]) return;
-      let i=0; while(i<x.o.length-2&&x.o[i+1]<e) i++;
-      const A=STOPS[x.s[i]], B=STOPS[x.s[i+1]]; if(!A||!B) return;
-      const f=Math.min(1,Math.max(0,(e-x.o[i])/((x.o[i+1]-x.o[i])||1)));
-      const p=[A.la+(B.la-A.la)*f, A.lo+(B.lo-A.lo)*f];
-      const txt=e<x.o[g.from]?T("{0} sonra durağında",inMin(g.board)):T("Yolculuk sürüyor");
-      L.marker(p,{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${lc(Ln)};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%);display:inline-block">${({metro:"🚇",marmaray:"🚆",tramvay:"🚊",vapur:"⛴",minibus:"🚐",dolmus:"🚐",otobus:"🚌",metrobus:"🚌",funikuler:"🚞",teleferik:"🚡"})[Ln.t]||"🚍"} ${bt(Ln)}</span>`,iconSize:[0,0]})}).bindTooltip(`${T("Bineceğin araç")} · ${txt} · ${T("tahmini")}`).addTo(vehLayer);
+      // Bineceğin otobüsün GPS konumu varsa onu göster (son sinyalden beri güzergâhta ilerletilmiş)
+      let p=null, canli=false;
+      if(Ln.a==="İETT"&&g.board>now){ const ge=gpsEta(x.s[g.from],Ln.b);
+        if(ge&&ge.veh){ let bi=-1,bd=4; ge.forEach((t,i)=>{ const d=Math.abs(t-g.board); if(d<bd){ bd=d; bi=i; } }); if(bi>=0){ p=ge.veh[bi].pos; canli=true; } } }
+      if(!p){
+        if(e<0||e>x.o[g.to]) return;
+        let i=0; while(i<x.o.length-2&&x.o[i+1]<e) i++;
+        const A=STOPS[x.s[i]], B=STOPS[x.s[i+1]]; if(!A||!B) return;
+        const f=Math.min(1,Math.max(0,(e-x.o[i])/((x.o[i+1]-x.o[i])||1)));
+        p=[A.la+(B.la-A.la)*f, A.lo+(B.lo-A.lo)*f];
+      }
+      const txt=(e<x.o[g.from]||canli?T("{0} sonra durağında",inMin(g.board)):T("Yolculuk sürüyor"))+" · "+(canli?T("canlı konum"):T("tahmini konum"));
+      L.marker(p,{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${lc(Ln)};border:2px solid ${canli?"#22c55e":"#fff"};box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%);display:inline-block">${({metro:"🚇",marmaray:"🚆",tramvay:"🚊",vapur:"⛴",minibus:"🚐",dolmus:"🚐",otobus:"🚌",metrobus:"🚌",funikuler:"🚞",teleferik:"🚡"})[Ln.t]||"🚍"} ${bt(Ln)}</span>`,iconSize:[0,0]})}).bindTooltip(`${T("Bineceğin araç")} · ${txt} · ${T("tahmini")}`).addTo(vehLayer);
     });
     return;
   }
@@ -1595,19 +1601,22 @@ function gpsEta(sid,b){
     let next=k; if(k<x.s.length-1){ const A=STOPS[x.s[k]].p,B=STOPS[x.s[k+1]].p; if(hav(pos,B)<hav(A,B)) next=k+1; }
     if(next>p) continue;                                                              // durağı geçmiş
     if(next===0&&bd<150) continue;                                                    // ilk durakta kalkış bekliyor: saati tarifeden
-    let min=0, prev=pos;
+    let min=0, prev=pos; const segs=[];
     for(let i=next;i<=p;i++){ const q=STOPS[x.s[i]].p, d=hav(prev,q)*1.2, sp=cellSpeed([(prev[0]+q[0])/2,(prev[1]+q[1])/2]);
       // sp yalnız hareket halindeki otobüslerin hızı: durak/ışık beklemesi için %70'i alınır
-      min+= sp!=null ? d/1000/Math.max(6,Math.min(40,sp*0.7))*60 : (i>next ? x.o[i]-x.o[i-1] : d/1000/18*60); prev=q; }
+      const dt= sp!=null ? d/1000/Math.max(6,Math.min(40,sp*0.7))*60 : (i>next ? x.o[i]-x.o[i-1] : d/1000/18*60);
+      segs.push([prev,q,dt]); min+=dt; prev=q; }
     const age=v.z?Math.max(0,(Date.now()-Date.parse(v.z.replace(" ","T")+"+03:00"))/60000):0;
     // Sinyal gecikmişse otobüs o arada yoluna devam etti: geçen süreyi düş. Hesaba göre durağı geçmişse sayma;
     // 15 dk'dan uzun sinyalsizse nerede olduğu artık tahmin edilemez.
     if(age>15) continue;
     const kalan=min-age; if(kalan<-1) continue;
-    out.push(nowM+Math.max(0,kalan));
+    // Şu anki tahmini yeri: son sinyalden bu yana geçen süre kadar güzergâhta ilerlet
+    let rem=age, at=pos; for(const [a,b2,dt] of segs){ if(rem<=0) break; if(rem>=dt){ rem-=dt; at=b2; } else { const f=rem/(dt||1); at=[a[0]+(b2[0]-a[0])*f,a[1]+(b2[1]-a[1])*f]; rem=0; } }
+    out.push([nowM+Math.max(0,kalan),{pos:at,age,k:v.k}]);
   }
   if(!out.length) return null;
-  out.sort((a,b)=>a-b); out.gps=true; return out;
+  out.sort((a,b)=>a[0]-b[0]); const r=out.map(o=>o[0]); r.veh=out.map(o=>o[1]); r.gps=true; return r;
 }
 function liveFor(sid,b){
   const g=gpsEta(sid,b); if(g){ g.planned=false; return g; }
