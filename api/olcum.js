@@ -24,7 +24,7 @@ function gecis(r, tr) {
     const la_ = Math.abs(ax * uy - ay * ux), lb_ = Math.abs(bx * uy - by * ux);
     if (sa < 0 && sb >= 0 && la_ < 300 && lb_ < 300) {
       const t = a.ts + (b.ts - a.ts) * (-sa / (sb - sa));
-      if (t >= r.t0 - 30000 && (!best || t < best)) best = t;
+      if (t >= r.t0 - 30000 && t <= r.t0 + 60 * 60000 && (!best || t < best)) best = t;   // 60 dk sonrası başka sefer
     }
   }
   return best;
@@ -62,9 +62,9 @@ module.exports = async (req, res) => {
       const araclar = Object.values(T[r.h] || {}).filter(a => !a.y || !r.y || nrm(a.y) === nrm(r.y) || nrm(a.y).includes(nrm(r.y)) || nrm(r.y).includes(nrm(a.y)));
       let gercek = null; for (const a of araclar) { const t = gecis(r, a.p); if (t && (!gercek || t < gercek)) gercek = t; }
       if (!gercek) {
-        if (izSon - r.t0 < 45 * 60000) { bekleyen++; continue; }
-        if (bosluk(r.t0, r.t0 + 45 * 60000)) { kapsamDisi++; neden.iz_boslugu++; continue; }
-        // İz kesintisizdi ama 45 dk içinde o yönde hiçbir otobüs durağı geçmedi: tahmin edilen araç gelmedi
+        if (izSon - r.t0 < 60 * 60000) { bekleyen++; continue; }
+        if (bosluk(r.t0, r.t0 + 60 * 60000)) { kapsamDisi++; neden.iz_boslugu++; continue; }
+        // İz kesintisizdi ama 60 dk içinde o yönde hiçbir otobüs durağı geçmedi: tahmin edilen araç gelmedi
         kapsamDisi++; neden.otobus_gelmedi++;
         const gk = (gelmeyen[r.h] || (gelmeyen[r.h] = { adet: 0, gps: 0, iett: 0 })); gk.adet++; if (r.g) gk.gps++; if (r.i) gk.iett++;
         continue;
@@ -74,13 +74,13 @@ module.exports = async (req, res) => {
       for (const src of ["g", "i"]) {
         if (!r[src]) continue;
         const hata = (r[src] - gercek) / 60000, uf = (gercek - r.t0) / 60000, kv = kova(uf);
-        const b = top[src][kv] || (top[src][kv] = { n: 0, mutlak: 0, isaret: 0 }); b.n++; b.mutlak += Math.abs(hata); b.isaret += hata;
+        const b = top[src][kv] || (top[src][kv] = { n: 0, mutlak: 0, isaret: 0, iki: 0 }); b.n++; b.mutlak += Math.abs(hata); b.isaret += hata; if (Math.abs(hata) <= 2) b.iki++;
         const hb = (hat[r.h] || (hat[r.h] = { g: { n: 0, m: 0 }, i: { n: 0, m: 0 } }))[src]; hb.n++; hb.m += Math.abs(hata);
       }
     }
-    const ozet = o => Object.fromEntries(Object.entries(o).map(([k, b]) => [k, { adet: b.n, ortalama_sapma_dk: +(b.mutlak / b.n).toFixed(2), egilim_dk: +(b.isaret / b.n).toFixed(2) }]));
+    const ozet = o => Object.fromEntries(Object.entries(o).map(([k, b]) => [k, { adet: b.n, iki_dk_icinde_yuzde: Math.round(100 * b.iki / b.n), ortalama_sapma_dk: +(b.mutlak / b.n).toFixed(2), egilim_dk: +(b.isaret / b.n).toFixed(2) }]));
     res.json({
-      aciklama: "sapma = |tahmin - gerçek varış|; eğilim + ise tahmin geç (araç tahminden önce geldi), - ise erken",
+      aciklama: "iki_dk_icinde_yuzde = tahminin gerçek varışa ±2 dk içinde tuttuğu kayıtların oranı (hedef bu); sapma = |tahmin - gerçek varış|; eğilim + ise tahmin geç (araç tahminden önce geldi), - ise erken",
       kayit: (olc || []).length, olculen, bekleyen, kapsamDisi, kapsam_disi_nedenleri: neden,
       izlenen_hat: Object.keys(T).length, iz_anlik: anlar.length, iz_baslangic: izIlk < Infinity ? new Date(izIlk + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null,
       tahmin_edilip_gelmeyen: gelmeyen,

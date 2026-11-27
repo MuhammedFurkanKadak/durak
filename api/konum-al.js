@@ -64,6 +64,7 @@ module.exports = async (req, res) => {
         const la = +v.Enlem, lo = +v.Boylam, s = +v.Hiz;
         if (!(la > 40.7 && la < 41.6 && lo > 27.9 && lo < 29.95) || !(s >= 0 && s < 110)) continue;
         if (ageMin(v.Saat) > 4) continue;            // eski konum: garajda/kapalı
+        if (s < 3) continue;                          // duran araç (garaj, son durak, mola) yol hızını düşürmesin
         const k = cell(la, lo); (cur[k] || (cur[k] = [0, 0]))[0] += s; cur[k][1]++; used++;
       }
       // Önceki özetle harmanla (son ~10 dk ağırlıklı ortalama)
@@ -87,8 +88,11 @@ module.exports = async (req, res) => {
       for (const v of list) {
         const m = kapi[v.KapiNo]; if (!m || ageMin(v.Saat) > 4) continue;
         const la = +v.Enlem, lo = +v.Boylam;
-        const o = once[v.KapiNo], rec = { k: v.KapiNo, la, lo, y: m.y, z: ist + " " + v.Saat };
-        if (o) { if (Math.abs(o.la - la) + Math.abs(o.lo - lo) > 0.0006) { rec.pla = o.la; rec.plo = o.lo; } else if (o.pla) { rec.pla = o.pla; rec.plo = o.plo; } }
+        const o = once[v.KapiNo], rec = { k: v.KapiNo, la, lo, y: m.y, z: ist + " " + v.Saat, s: +v.Hiz || 0 };
+        // hm: aracın en son yer değiştirdiği an (uzun süredir duran araç seferde değildir: garaj, son durak, mola)
+        if (o) { if (Math.abs(o.la - la) + Math.abs(o.lo - lo) > 0.0006) { rec.pla = o.la; rec.plo = o.lo; rec.hm = Date.now(); }
+                 else { if (o.pla) { rec.pla = o.pla; rec.plo = o.plo; } rec.hm = o.hm || 0; } }
+        else rec.hm = rec.s > 3 ? Date.now() : 0;
         (hatf[m.h] || (hatf[m.h] = [])).push(rec);
         if (olcSet.has(m.h)) iz.push([m.h, v.KapiNo, m.y, +la.toFixed(5), +lo.toFixed(5), Date.parse(ist + "T" + v.Saat + "+03:00")]);
       }
