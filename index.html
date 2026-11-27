@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271900";
+const APP_VERSION="202611271930";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1407,6 +1407,7 @@ function renderPlans(){
 }
 function showList(){
   if(NAV) stopNav(true);
+  try{ renderPlans(); }catch(e){}
   M.sel=null; routeLayer.clearLayers(); if(trafLayer) trafLayer.clearLayers(); if(cityTraf) cityTraf.clearLayers();
   document.getElementById("rsearch").hidden=false; document.getElementById("plans").hidden=false;
   document.getElementById("detail").hidden=true; document.getElementById("dtop").hidden=true; mv.classList.remove("det"); setTimeout(()=>map.invalidateSize(),0);
@@ -1587,7 +1588,8 @@ function gpsEta(sid,b){
   const nowM=nowMin(), H=nrm(x.h), out=[];
   for(const v of G.v.araclar){
     if(!v.la||!v.lo) continue;
-    if(v.hm!==undefined&&Date.now()-(v.hm||0)>6*60000&&!(v.s>3)) continue;   // 6 dk'dır yerinden oynamıyor: seferde değil
+    const durgun=v.hm!==undefined&&!(v.s>5)?(Date.now()-(v.hm||0))/60000:0;   // kaç dakikadır yerinden oynamıyor
+    if(durgun>30) continue;                                                       // park etmiş: seferde değil
     const pos=[v.la,v.lo]; let k=-1,bd=1e9;
     for(let i=0;i<x.s.length;i++){ const d=hav(pos,STOPS[x.s[i]].p); if(d<bd){ bd=d; k=i; } }
     if(bd>400) continue;                                                              // güzergâhta değil
@@ -1613,7 +1615,12 @@ function gpsEta(sid,b){
     const kalan=min-age; if(kalan<-1) continue;
     // Şu anki tahmini yeri: son sinyalden bu yana geçen süre kadar güzergâhta ilerlet
     let rem=age, at=pos; for(const [a,b2,dt] of segs){ if(rem<=0) break; if(rem>=dt){ rem-=dt; at=b2; } else { const f=rem/(dt||1); at=[a[0]+(b2[0]-a[0])*f,a[1]+(b2[1]-a[1])*f]; rem=0; } }
-    out.push([nowM+Math.max(0,kalan),{pos:at,age,k:v.k}]);
+    let eta=nowM+Math.max(0,kalan);
+    // 3+ dk duruyorsa (hat başında, molada ya da kalkış saatini bekliyor): durağa tarifedeki saatinden önce gelemez.
+    // Ondan sonraki ilk tarife saatine kaydır (yakında tarifeli sefer yoksa duran aracı sayma).
+    if(durgun>=3){ const sch=depsToday(x).map(t=>t+x.o[p]).find(t=>t>=eta-1);
+      if(sch===undefined||sch-eta>45) continue; eta=Math.max(eta,sch); at=pos; }
+    out.push([eta,{pos:at,age,k:v.k,bekliyor:durgun>=3}]);
   }
   if(!out.length) return null;
   out.sort((a,b)=>a[0]-b[0]); const r=out.map(o=>o[0]); r.veh=out.map(o=>o[1]); r.gps=true; return r;
@@ -1721,7 +1728,7 @@ async function liveRefresh(){
   // altında canlı dakika görünmesin). Değiştiyse detayı yeniden çiz.
   if(!state.stop&&M.sel!==null&&M.plans&&M.plans[M.sel]){ const o=M.plans[M.sel], nn=retimeLive(o);
     const sig=p=>p.legs?p.legs.map(g=>Math.round(g.board)+(g.lv||"")).join(","):"";
-    if(nn!==o&&sig(nn)!==sig(o)){ nn.tags=o.tags; nn.alts=o.alts; M.plans[M.sel]=nn; openPlan(M.sel); return; } }
+    if(nn!==o&&sig(nn)!==sig(o)){ nn.tags=o.tags; nn.alts=o.alts; M.plans[M.sel]=nn; try{ renderPlans(); }catch(e){} openPlan(M.sel); return; } }
   els.forEach(e=>{
     const lt=liveFor(e.dataset.lsid,e.dataset.lb), nm0=nowMin();
     const items=(lt||[]).map(t=>({dk:Math.max(0,Math.round(t-nm0))}));
