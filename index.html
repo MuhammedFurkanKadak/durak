@@ -359,7 +359,7 @@ const EN={
 "Havalimanı":"Airport","İstanbul Havalimanı":"Istanbul Airport","Sabiha Gökçen":"Sabiha Gökçen",
 "Havalimanındasın: şehirde nereye gideceğini yaz.":"You're at the airport: type where you're going in the city.",
 "Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.":"Airport coaches (IST: Havaist, SAW: Havabüs) have their own fares and aren't shown in these routes.",
-"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı konum":"live position","araç bekliyor, tarifedeki kalkışına göre":"vehicle waiting; based on its scheduled departure","araç bekliyor":"vehicle waiting","Araç bekliyor; tarifeye göre {0} sonra":"Vehicle waiting; scheduled in {0}","{0} aracı erken geçiyor, yetişemezsin; sonraki gösteriliyor":"{0} passes early, you can't make it; showing the next one","canlıda {0}'de geçen araca yetişemezsin, bu sonraki sefer":"you can't catch the one passing at {0} (live); this is the next trip","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next","tarifede {0}; gecikmeli gelebilir, sonraki {1}":"scheduled {0}; may be running late, next {1}","tarifede {0}; gecikmeli gelebilir":"scheduled {0}; may be running late","yoğun trafik":"heavy traffic","trafik var":"traffic","{0}, süre değişebilir":"{0}, time may change"
+"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı konum":"live position","araç bekliyor, tarifedeki kalkışına göre":"vehicle waiting; based on its scheduled departure","araç bekliyor":"vehicle waiting","Araç bekliyor; tarifeye göre {0} sonra":"Vehicle waiting; scheduled in {0}","{0} aracı erken geçiyor, yetişemezsin; sonraki gösteriliyor":"{0} passes early, you can't make it; showing the next one","canlıda {0}'de geçen araca yetişemezsin, bu sonraki sefer":"you can't catch the one passing at {0} (live); this is the next trip","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next","Sıradaki trenler":"Next trains","tarifede {0}; gecikmeli gelebilir, sonraki {1}":"scheduled {0}; may be running late, next {1}","tarifede {0}; gecikmeli gelebilir":"scheduled {0}; may be running late","yoğun trafik":"heavy traffic","trafik var":"traffic","{0}, süre değişebilir":"{0}, time may change"
 };
 function T(s,...a){ let r=(LANG==="en"&&EN[s]!==undefined)?EN[s]:s; a.forEach((v,i)=>{ r=r.split("{"+i+"}").join(v); }); return r; }
 const yonT=y=>LANG==="en"?"to "+y:y+" yönü";
@@ -431,7 +431,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611272005";
+const APP_VERSION="202611272010";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1044,14 +1044,26 @@ function legVariants(o,now){
 // Sıralama: yolculuk süresine göre (evden çıkıştan varışa). Her açıdan daha kötü olanlar (süre, aktarma, yürüme) elenir.
 // Araç binilen duraktan sonra konuma daha yakın bir duraktan da geçiyorsa oradan bin (geri yürüyüp aracı
 // kendi önünden geçerken yakalamak saçma); aynı şekilde varıştan önce hedefe daha yakın durakta in.
-// Marmaray'ın canlı verisi yok: tarifedeki saati 3 dk'dan az önce geçmiş tren çoğu zaman 1–2 dk gecikmeli
-// gelir. Durağa gelecek ilk araç olarak onu göster (kullanıcı yetişip yetişemeyeceğine kendisi karar verir).
+// Marmaray'da aynı hat birden çok kısa/uzun seferle işler (Halkalı–Gebze, Ataköy–Pendik, Zeytinburnu–Pendik…):
+// iki durak arasında hepsi aynı trendir. Biniş ve iniş durağını içeren bütün sefer düzenlerindeki trenler.
+function railDeps(g,from,n){
+  const Ln=LINES[g.li], x0=Ln.dir[g.di], a=x0.s[g.from], b=x0.s[g.to], out=[];
+  Ln.dir.forEach((x,di)=>{ const i=x.s.indexOf(a), j=x.s.indexOf(b); if(i<0||j<=i) return;
+    depsToday(x).forEach(t=>{ const v=t+x.o[i]; if(v>=from) out.push({t:v,h:x.h,di,i,j,r:x.o[j]-x.o[i]}); }); });
+  out.sort((p,q)=>p.t-q.t); const u=[]; out.forEach(e=>{ if(!u.length||e.t-u[u.length-1].t>0.4) u.push(e); });
+  return u.slice(0,n);
+}
+const hsT=h=>String(h||"").toLocaleLowerCase("tr").replace(/(^|[\s-])(\S)/g,(m,p,c)=>p+c.toLocaleUpperCase("tr"));
+// Canlı verisi yok: tarifedeki saatini 1,5 dk'dan az önce geçmiş tren çoğu zaman 1–2 dk gecikmeli gelir; onu da
+// göster. İlk binişte gelecek ilk tren hangi sefer düzeninden olursa olsun (Pendik ya da Gebze) o gösterilir.
 function recentRail(o){
   if(o.walk||o._rr||!o.legs||!o.legs.length) return; o._rr=1;
   const g=o.legs[0], Ln=LINES[g.li]; if(Ln.t!=="marmaray") return;
-  const x=Ln.dir[g.di], now=nowMin(), off=x.o[g.from];
-  const t=depsToday(x).map(d=>d+off).filter(d=>d>=now-1.5&&d<now&&d<g.board-0.5).pop();
-  if(t!==undefined) o.legs[0]={...g,board:t,gec:1};
+  const now=nowMin(), e=railDeps(g,now-1.5,1)[0];
+  if(!e||e.t>=g.board-0.4) return;
+  const single=o.legs.length===1;
+  o.legs[0]={...g,di:e.di,from:e.i,to:e.j,board:e.t,gec:e.t<now?1:0};
+  if(single){ const arr=e.t+e.r+(o.w2?o.w2.w:0); if(arr<o.arr) o.arr=arr; }
 }
 function smoothEnds(o){
   if(o.walk||o._se||!o.legs||!o.legs.length) return; o._se=1;
@@ -1534,7 +1546,8 @@ function openPlan(k){
       <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb${bt(s.Ln).length>4?" long":""}" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
         <div class="tx"><b>${T("Bin:")} ${esc(s.on)}</b><span>${yonT(esc(s.yon))} · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${FR.legs[ri].f===0?T("ücretsiz aktarma"):tl(FR.legs[ri].f,FR.legs[ri].ap)+" · "+T("tam bilet")}</span>`:""}
           <span class="lv" data-lsid="${s.x.s[s.g.from]}" data-lb="${esc(s.Ln.b)}" data-lplan="1"></span>
-          <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):(isTomorrow(s.t,now)?T("Yarın {0}'de geçiyor (ilk sefer)",fmt(s.t)):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now)))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${s.g.lv==="live"?`<b class="livet${s.g.kt?" tr"+s.g.kt:""}">${T("canlı")}${s.g.kt?" · "+T("{0}, süre değişebilir",trfTxt(s.g.kt)):""}</b>`:s.g.lv==="wait"?`<b class="lvw">${T("araç bekliyor, tarifedeki kalkışına göre")}</b>`:s.g.lv==="nolive"?`<b class="lvw">⚠️ ${T("canlıda araç yok")}</b>`:s.g.gec?`<b class="lvw">${(n1=>n1!==undefined?T("tarifede {0}; gecikmeli gelebilir, sonraki {1}",fmt(s.g.board),fmt(n1)):T("tarifede {0}; gecikmeli gelebilir",fmt(s.g.board)))(nextAt(LINES[s.g.li].dir[s.g.di],s.g.from,now)[0])}</b>`:T("tarifeye göre")}</span>
+          <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):(isTomorrow(s.t,now)?T("Yarın {0}'de geçiyor (ilk sefer)",fmt(s.t)):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now)))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${s.g.lv==="live"?`<b class="livet${s.g.kt?" tr"+s.g.kt:""}">${T("canlı")}${s.g.kt?" · "+T("{0}, süre değişebilir",trfTxt(s.g.kt)):""}</b>`:s.g.lv==="wait"?`<b class="lvw">${T("araç bekliyor, tarifedeki kalkışına göre")}</b>`:s.g.lv==="nolive"?`<b class="lvw">⚠️ ${T("canlıda araç yok")}</b>`:s.g.gec?`<b class="lvw">${(n1=>n1!==undefined?T("tarifede {0}; gecikmeli gelebilir, sonraki {1}",fmt(s.g.board),fmt(n1)):T("tarifede {0}; gecikmeli gelebilir",fmt(s.g.board)))((railDeps(s.g,now,1)[0]||{}).t)}</b>`:T("tarifeye göre")}</span>
+          ${s.Ln.t==="marmaray"?(L2=>L2.length>1?`<span class="wait">${T("Sıradaki trenler")}: ${L2.map(e=>`${fmt(e.t)} ${esc(hsT(e.h))}`).join(" · ")}</span>`:"")(railDeps(s.g,s.first?Math.min(s.t,now-1.5):s.t-0.4,4)):""}
           ${s.ara.length?`<details><summary>${s.ara.length+1} ${T("durak")} · ~${dk(s.dk)}</summary><ol class="ara">${s.ara.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>`:`<span>1 ${T("durak")} · ~${dk(s.dk)}</span>`}
           <b style="margin-top:6px">${T("İn:")} ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
