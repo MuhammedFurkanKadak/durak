@@ -2,6 +2,8 @@
 // İBB konum servisi yalnızca Türkiye'den erişilebildiği için konumları Mac'teki betik çekip buraya yollar.
 //   POST /api/konum-al?tur=filo          gövde: İBB'nin GetFiloAracKonum_json SOAP yanıtı (olduğu gibi)
 //   POST /api/konum-al?tur=hat&h=26B     gövde: GetHatOtoKonum_json SOAP yanıtı
+//   POST /api/konum-al?tur=uymgeo&z=1   gövde: İBB trafik yol parçası şekilleri (v3/Segments/z)
+//   POST /api/konum-al?tur=uym          gövde: İBB anlık trafik (v4/SegmentData)
 //   GET  /api/konum-al?istek=1           sırada çekilmesi gereken hat (uygulamada son 10 dk'da bakılan, en eski güncellenen)
 // Hepsi "x-key" başlığında KONUM_KEY ister.
 // Hat yanıtlarından "kapı no -> hat/yön" eşleşmesi öğrenilir; sonra o araçlar 2 dk'da bir gelen filo
@@ -47,6 +49,39 @@ module.exports = async (req, res) => {
     if (req.method !== "POST") { res.statusCode = 405; return res.end(); }
     const xml = await readBody(req);
 
+    // İBB Trafik (UYM) yol parçası şekilleri: /web/api/TrafficData/v3/Segments/{1..5} (yol sınıfları).
+    // Her parçanın geçtiği ~330 m hücreleri bir kez hesaplanıp saklanır ("uymgeo").
+    if (q.tur === "uymgeo") {
+      const z = String(q.z || "").slice(0, 2), segs = JSON.parse(xml), m = {};
+      for (const sg of segs) {
+        let pts; try { pts = typeof sg.G === "string" ? JSON.parse(sg.G) : sg.G; } catch (e) { continue; }
+        if (!Array.isArray(pts) || !pts.length) continue;
+        const cs = new Set();
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[i + 1] || a; const n = Math.max(1, Math.ceil((Math.abs(b[0] - a[0]) / CELL_LAT + Math.abs(b[1] - a[1]) / CELL_LON) * 3));
+          for (let j = 0; j <= n; j++) cs.add(cell(a[0] + (b[0] - a[0]) * j / n, a[1] + (b[1] - a[1]) * j / n));
+        }
+        m[sg.S] = [...cs];
+      }
+      await pipe([["HSET", "uymgeo", "z" + z, JSON.stringify(m)]]);
+      return res.json({ ok: true, z, parca: Object.keys(m).length });
+    }
+    // Anlık UYM trafiği: /web/api/TrafficData/v4/SegmentData  {Data:[{S,V,C}]}  C: 1 akıcı … 5 tıkalı, V km/sa.
+    // Hücre başına en kötü (en yüksek) yoğunluk ve o parçaların ortalama hızı -> "uym"
+    if (q.tur === "uym") {
+      const j = JSON.parse(xml), data = (j && j.Data) || [];
+      const [geoAll] = await pipe([["HGETALL", "uymgeo"]]);
+      const geo = {}; if (Array.isArray(geoAll)) for (let i = 1; i < geoAll.length; i += 2) { try { Object.assign(geo, JSON.parse(geoAll[i])); } catch (e) {} }
+      const per = {}; let eslesen = 0;
+      for (const d of data) {
+        const cs = geo[d.S]; if (!cs || !(d.C >= 1)) continue; eslesen++;
+        for (const k of cs) { const o = per[k] || (per[k] = [0, 0, 0]); o[0] += d.V; o[1]++; o[2] = Math.max(o[2], d.C); }
+      }
+      const g = {}; for (const [k, [v, n, c]] of Object.entries(per)) g[k] = [Math.round(v / n), c];
+      await pipe([["SET", "uym", JSON.stringify({ t: Date.now(), g }), "EX", 900]]);
+      return res.json({ ok: true, veri: data.length, eslesen, hucre: Object.keys(g).length, sekil: Object.keys(geo).length });
+    }
+
     if (q.tur === "hat") {
       const h = String(q.h || "").slice(0, 10);
       const list = soapResult(xml, "GetHatOtoKonum_json");
@@ -77,6 +112,19 @@ module.exports = async (req, res) => {
         g[k] = o ? [(o[0] * o[1] + v * n) / (o[1] + n), o[1] + n] : [v, n];
       }
       for (const k of Object.keys(g)) { if (g[k][1] < 0.3) delete g[k]; else g[k] = [Math.round(g[k][0] * 10) / 10, Math.round(g[k][1] * 10) / 10]; }
+      // Geçmiş: haftanın günü + saat başına her hücrede hareketli otobüs hızı (yavaş harmanlanan ortalama).
+      // Birkaç gün birikince "bu yol cuma 18:00'de ne kadar sürer" sorusu buradan cevaplanır. 15 gün saklanır.
+      try {
+        const ist = new Date(Date.now() + 3 * 3600e3), hk = "hh:" + ist.getUTCDay() + ":" + ist.getUTCHours();
+        const ks = Object.keys(cur);
+        if (ks.length) {
+          const [eski] = await pipe([["HMGET", hk, ...ks]]);
+          const set = [];
+          ks.forEach((k, i) => { const v = cur[k][0] / cur[k][1]; const e = eski && eski[i] ? eski[i].split(",").map(Number) : null;
+            const n = e ? Math.min(e[1] + 1, 60) : 1, nv = e ? e[0] + (v - e[0]) / n : v; set.push(k, Math.round(nv * 10) / 10 + "," + n); });
+          await pipe([["HSET", hk, ...set], ["EXPIRE", hk, 15 * 86400]]);
+        }
+      } catch (e) {}
       // Hat eşleşmesi bilinen araçları hatlara dağıt (6 saatten eski eşleşme sayılmaz)
       const [kapiFlat, olc, eskiS] = await pipe([["HGETALL", "kapi"], ["ZRANGEBYSCORE", "olch", Date.now() - 5400000, "+inf"], ["GET", "hatf"]]);
       // Bir önceki filo turundaki konumlar: aracın gidiş yönünü hareketinden anlamak için (hat sorgusundaki yön

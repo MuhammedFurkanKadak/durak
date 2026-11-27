@@ -1,6 +1,6 @@
 // Durak – uygulamanın okuduğu araç konum / trafik hızı verisi (Vercel Function)
 //   /api/konum?hat=26B,34     o hatların araçları (Mac'teki toplayıcının en son yolladığı); istek sıraya da yazılır
-//   /api/konum?hiz=1          ~330 m'lik hücrelerde otobüslerin son dakikalardaki ortalama hızı (km/sa)
+//   /api/konum?hiz=1          ~330 m'lik hücrelerde otobüslerin son dakikalardaki ortalama hızı (km/sa) + UYM trafiği (u)
 const { pipe, ok } = require("./_redis");
 
 module.exports = async (req, res) => {
@@ -9,9 +9,12 @@ module.exports = async (req, res) => {
   if (!ok) { res.statusCode = 503; return res.json({ hata: "Redis bağlı değil" }); }
   try {
     if (q.hiz) {
-      const [s] = await pipe([["GET", "hiz"]]);
+      const [s, u] = await pipe([["GET", "hiz"], ["GET", "uym"]]);
       res.setHeader("Cache-Control", "public, s-maxage=50, stale-while-revalidate=30");
-      return res.end(s || "null");
+      // UYM (araç trafiği) hücreleri "u" alanında: {t, g:{hücre:[km/sa, yoğunluk 1-5]}}
+      if (!s && !u) return res.end("null");
+      const o = s ? JSON.parse(s) : { t: 0, cl: 0.003, co: 0.004, g: {} }; if (u) o.u = JSON.parse(u);
+      return res.end(JSON.stringify(o));
     }
     const lines = [...new Set(String(q.hat || "").split(","))].map(h => h.trim().slice(0, 10)).filter(Boolean).slice(0, 8);
     if (!lines.length) { res.statusCode = 400; return res.json({ hata: "hat=26B gibi" }); }
