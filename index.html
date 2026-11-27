@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271125";
+const APP_VERSION="202611271325";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1600,7 +1600,11 @@ function gpsEta(sid,b){
       // sp yalnız hareket halindeki otobüslerin hızı: durak/ışık beklemesi için %70'i alınır
       min+= sp!=null ? d/1000/Math.max(6,Math.min(40,sp*0.7))*60 : (i>next ? x.o[i]-x.o[i-1] : d/1000/18*60); prev=q; }
     const age=v.z?Math.max(0,(Date.now()-Date.parse(v.z.replace(" ","T")+"+03:00"))/60000):0;
-    out.push(nowM+Math.max(0,min-Math.min(age,3)));
+    // Sinyal gecikmişse otobüs o arada yoluna devam etti: geçen süreyi düş. Hesaba göre durağı geçmişse sayma;
+    // 15 dk'dan uzun sinyalsizse nerede olduğu artık tahmin edilemez.
+    if(age>15) continue;
+    const kalan=min-age; if(kalan<-1) continue;
+    out.push(nowM+Math.max(0,kalan));
   }
   if(!out.length) return null;
   out.sort((a,b)=>a-b); out.gps=true; return out;
