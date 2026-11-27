@@ -357,7 +357,7 @@ const EN={
 "Havalimanı":"Airport","İstanbul Havalimanı":"Istanbul Airport","Sabiha Gökçen":"Sabiha Gökçen",
 "Havalimanındasın: şehirde nereye gideceğini yaz.":"You're at the airport: type where you're going in the city.",
 "Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.":"Airport coaches (IST: Havaist, SAW: Havabüs) have their own fares and aren't shown in these routes.",
-"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Son dakikalarda o yoldan geçen otobüslerin hızından; veri olmayan kısım renksiz.":"From the speed of buses on that road in the last few minutes; parts without data are uncoloured.","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
+"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
 };
 function T(s,...a){ let r=(LANG==="en"&&EN[s]!==undefined)?EN[s]:s; a.forEach((v,i)=>{ r=r.split("{"+i+"}").join(v); }); return r; }
 const yonT=y=>LANG==="en"?"to "+y:y+" yönü";
@@ -407,7 +407,7 @@ function clearEnd(w){
   if(w==="to"||w==="both"){ M.B=null; M.Bname=""; M.Bids=null; toQ.value=""; }
   M.runId=(M.runId||0)+1; M.plans=null; M.direct=null; M.deep=null;
   if(M.sel!==null||!document.getElementById("detail").hidden) showList();
-  routeLayer.clearLayers(); if(trafLayer) trafLayer.clearLayers(); if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
+  routeLayer.clearLayers(); if(trafLayer) trafLayer.clearLayers(); if(cityTraf) cityTraf.clearLayers(); if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
   drawMarkers(); clrBtns(); homeBackBtn(); renderPlans(); sugg.hidden=true;
   msg(!M.A?T("Nereden başlayacağını seç: konumun, bir durak ya da haritada bir nokta."):T("Nereye gideceğini yaz ya da haritada bir yere dokun."));
 }
@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271115";
+const APP_VERSION="202611271130";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -779,13 +779,13 @@ async function setBase(){
     setTimeout(()=>{ if(!ready&&glState==="load"){ glState="fail"; try{ map.removeLayer(glLayer); }catch(_){} useOSM(true); } },15000);
   }catch(e){ clearTimeout(t); glState="fail"; useOSM(true); }
 }
-let map, lineLayer, stopLayer, vehLayer, routeLayer, trafLayer=null, mkA, mkB, myLoc=null, locAsked=false;
+let map, lineLayer, stopLayer, vehLayer, routeLayer, trafLayer=null, cityTraf=null, mkA, mkB, myLoc=null, locAsked=false;
 const M={A:null,B:null,Aname:"",Bname:"",Aids:null,Bids:null,plans:null,sel:null,field:"to"};
 function initMap(){
   map=L.map("map",{zoomControl:true,preferCanvas:true}).setView(CITY.c,CITY.z);
   map.attributionControl.setPrefix(false);
   setBase();
-  lineLayer=L.layerGroup().addTo(map); stopLayer=L.layerGroup(); vehLayer=L.layerGroup().addTo(map); routeLayer=L.layerGroup().addTo(map); trafLayer=L.layerGroup().addTo(map);
+  lineLayer=L.layerGroup().addTo(map); stopLayer=L.layerGroup(); vehLayer=L.layerGroup().addTo(map); cityTraf=L.layerGroup().addTo(map); routeLayer=L.layerGroup().addTo(map); trafLayer=L.layerGroup().addTo(map);
   // Raylı sistem ve vapur hatları (arka planda, soluk)
   LINES.forEach(Ln=>{ if(Ln.t==="minibus"||Ln.t==="dolmus"||Ln.t==="otobus") return;
     const x=Ln.dir[0], pts=x.g||x.s.map(s=>STOPS[s]?.p).filter(Boolean);
@@ -802,7 +802,7 @@ function initMap(){
         .addTo(stopLayer); });
     stopLayer.addTo(map);
   };
-  map.on("moveend",()=>{ drawStops(); drawVehicles(); });
+  map.on("moveend",()=>{ drawStops(); drawVehicles(); if(M.sel!==null) drawCityTraffic(); });
   // Haritaya dokununca: buradan mı, buraya mı?
   map.on("click",e=>{
     if(M.sel!==null) return;
@@ -1401,7 +1401,7 @@ function renderPlans(){
 }
 function showList(){
   if(NAV) stopNav(true);
-  M.sel=null; routeLayer.clearLayers(); if(trafLayer) trafLayer.clearLayers();
+  M.sel=null; routeLayer.clearLayers(); if(trafLayer) trafLayer.clearLayers(); if(cityTraf) cityTraf.clearLayers();
   document.getElementById("rsearch").hidden=false; document.getElementById("plans").hidden=false;
   document.getElementById("detail").hidden=true; document.getElementById("dtop").hidden=true; mv.classList.remove("det"); setTimeout(()=>map.invalidateSize(),0);
   if(M.A&&M.B) lineLayer.remove(); else if(!map.hasLayer(lineLayer)) lineLayer.addTo(map);
@@ -1427,7 +1427,7 @@ async function streetWalk(s,pl,k){
 // Kaynak: o yoldan son dakikalarda geçen otobüslerin hızı (İBB filo verisi). Yalnız karayolu ayaklarında, veri olan yerde.
 let TRAF_ON=(()=>{ try{ return localStorage.getItem("durak-trafik")!=="0"; }catch(e){ return true; } })();
 const ROADT=new Set(["otobus","minibus","dolmus","metrobus"]);
-const trafColor=sp=>sp==null?null:sp>=25?"#1a9e55":sp>=15?"#f0a202":"#d7263d";
+const trafColor=sp=>sp==null||sp>=25?null:sp>=15?"#f0a202":"#d7263d";   // akan yol işaretlenmez: sadece yavaş ve sıkışık
 function drawTraffic(ss){
   if(!trafLayer) return; trafLayer.clearLayers();
   if(!TRAF_ON||CITYK!=="ist"||!HIZ) return;
@@ -1443,26 +1443,54 @@ function drawTraffic(ss){
     flush();
   });
 }
+// Şehrin geri kalanı: otobüs geçen bütün yollar (hat şekilleri), haritada görünen kısımda yavaş/sıkışık olanlar
+let ROADSEG=null;
+function buildRoadSeg(){
+  ROADSEG={}; const seen=new Set(), r=v=>Math.round(v*1e4);
+  LINES.forEach(L=>{ if(!ROADT.has(L.t)) return; L.dir.forEach(x=>{
+    if(!x.g||x.g.length<2) return;                      // yol şekli olmayan hatlar duraktan durağa düz çizgi olur, yolu göstermez
+    const path=x.g;
+    for(let i=1;i<path.length;i++){ const a=path[i-1], b=path[i];
+      const k1=r(a[0])+","+r(a[1])+"|"+r(b[0])+","+r(b[1]), k2=r(b[0])+","+r(b[1])+"|"+r(a[0])+","+r(a[1]);
+      if(seen.has(k1)||seen.has(k2)) continue; seen.add(k1);
+      if(hav(a,b)>1500) continue;
+      const m=[(a[0]+b[0])/2,(a[1]+b[1])/2], ck=Math.floor(m[0]/0.003)+":"+Math.floor(m[1]/0.004);
+      (ROADSEG[ck]||(ROADSEG[ck]=[])).push([a,b,m]); } }); });
+}
+function drawCityTraffic(){
+  if(!cityTraf) return; cityTraf.clearLayers();
+  if(!TRAF_ON||CITYK!=="ist"||!HIZ||M.sel===null) return;
+  if(!ROADSEG) buildRoadSeg();
+  const B=map.getBounds().pad(.1), y=[], r=[];
+  const a0=Math.floor(B.getSouth()/HIZ.cl), a1=Math.floor(B.getNorth()/HIZ.cl), o0=Math.floor(B.getWest()/HIZ.co), o1=Math.floor(B.getEast()/HIZ.co);
+  if((a1-a0)*(o1-o0)>40000) return;                     // çok uzaktan bakılıyor: şehrin tamamını çizme
+  for(let a=a0;a<=a1;a++) for(let o=o0;o<=o1;o++){
+    const segs=ROADSEG[a+":"+o]; if(!segs) continue;
+    for(const [p,q,m] of segs){ const c=trafColor(cellSpeed(m)); if(c==="#f0a202") y.push([p,q]); else if(c) r.push([p,q]); }
+  }
+  if(y.length) L.polyline(y,{color:"#f0a202",weight:3,opacity:.8,interactive:false}).addTo(cityTraf);
+  if(r.length) L.polyline(r,{color:"#d7263d",weight:3,opacity:.85,interactive:false}).addTo(cityTraf);
+}
 async function trafficFor(k,ss){
   if(CITYK!=="ist") return;
   if(!HIZ||Date.now()-HIZ.t>3*60000){ HIZ_AT=0; await gpsFetch([]); }
-  if(M.sel===k) drawTraffic(ss);
+  if(M.sel===k){ drawTraffic(ss); drawCityTraffic(); }
 }
 document.addEventListener("change",e=>{ if(e.target.id!=="trafon") return; TRAF_ON=e.target.checked;
   try{ localStorage.setItem("durak-trafik",TRAF_ON?"1":"0"); }catch(_){}
-  if(M.sel!==null&&M.plans&&M.plans[M.sel]) drawTraffic(steps(M.plans[M.sel])); });
+  if(M.sel!==null&&M.plans&&M.plans[M.sel]){ drawTraffic(steps(M.plans[M.sel])); drawCityTraffic(); } });
 function trafficLegend(o){
   if(CITYK!=="ist"||!o.legs||!o.legs.some(g=>ROADT.has(LINES[g.li].t))) return "";
-  return `<label class="traf"><input type="checkbox" id="trafon" ${TRAF_ON?"checked":""}> ${T("Yolda trafik")}
-    <i style="background:#1a9e55"></i>${T("akıyor")} <i style="background:#f0a202"></i>${T("yavaş")} <i style="background:#d7263d"></i>${T("sıkışık")}
-    <small>${T("Son dakikalarda o yoldan geçen otobüslerin hızından; veri olmayan kısım renksiz.")}</small></label>`;
+  return `<label class="traf"><input type="checkbox" id="trafon" ${TRAF_ON?"checked":""}> ${T("Trafik")}
+    <i style="background:#f0a202"></i>${T("yavaş")} <i style="background:#d7263d"></i>${T("sıkışık")}
+    <small>${T("Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.")}</small></label>`;
 }
 function openPlan(k){
   if(!(history.state&&history.state.d==="det")) try{ history.pushState({d:"det"},""); }catch(e){}
   M.sel=k; const o=M.plans[k], ss=steps(o), now=nowMin();
   document.getElementById("rsearch").hidden=true; document.getElementById("plans").hidden=true; document.getElementById("dtop").hidden=false; mv.classList.add("det"); map.invalidateSize();
   lineLayer.remove(); stopLayer.remove(); map.closePopup();
-  routeLayer.clearLayers(); if(trafLayer) trafLayer.clearLayers();
+  routeLayer.clearLayers(); if(trafLayer) trafLayer.clearLayers(); if(cityTraf) cityTraf.clearLayers();
   ss.forEach(s=>{
     if(s.k==="walk"){ if(s.m>5){ const pl=L.polyline([s.from,s.to],{color:"#6b7078",weight:4,dashArray:"1 9",lineCap:"round",interactive:false}).addTo(routeLayer); if(s.m>60) streetWalk(s,pl,k); } return; }
     const path=legPath(s.x,s.g.from,s.g.to), c=lc(s.Ln);
