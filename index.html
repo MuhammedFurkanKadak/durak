@@ -431,7 +431,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611272345";
+const APP_VERSION="202611272355";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1634,8 +1634,8 @@ function gpsEta(sid,b){
       segs.push([prev,q,dt]); min+=dt; prev=q; }
     const age=v.z?Math.max(0,(Date.now()-Date.parse(v.z.replace(" ","T")+"+03:00"))/60000):0;
     // Sinyal gecikmişse otobüs o arada yoluna devam etti: geçen süreyi düş. Hesaba göre durağı geçmişse sayma;
-    // 15 dk'dan uzun sinyalsizse nerede olduğu artık tahmin edilemez.
-    if(age>15) continue;
+    // 6 dk'dan uzun sinyalsizse nerede olduğu güvenilir değil (sıkı mod).
+    if(age>6) continue;                                                              // sıkı mod: 6 dk'dan eski sinyal sayılmaz
     const kalan=min-age; if(kalan<-1) continue;
     // Şu anki tahmini yeri: son sinyalden bu yana geçen süre kadar güzergâhta ilerlet
     let rem=age, at=pos; for(const [a,b2,dt] of segs){ if(rem<=0) break; if(rem>=dt){ rem-=dt; at=b2; } else { const f=rem/(dt||1); at=[a[0]+(b2[0]-a[0])*f,a[1]+(b2[1]-a[1])*f]; rem=0; } }
@@ -1689,18 +1689,25 @@ function trafLevel(sid,b,eta){
   if(sch<Math.min(need,8)*0.4) return 0;
   const k=cur/sch; return k>=2?2:k>=1.5?1:0;
 }
+// SIKI MOD: canlı dakika yalnız GPS'te gözle görülen gerçek bir araca dayanır (sinyali taze, doğru yönde,
+// durağa henüz varmamış). İETT'nin tahmini tek başına asla "canlı" gösterilmez: yalnız doğrulanmış bir araçla
+// örtüşürse (±3 dk) yakın mesafede onun değeri kullanılır (0–8 dk'da İETT daha isabetli ölçüldü).
+// GPS'te araç yoksa ya da GPS verisi yoksa canlı dakika verilmez; ekranda tarife görünür.
 function liveFor(sid,b){
-  const g=gpsEta(sid,b), r0=g||liveIett(sid,b);
-  if(!r0||!r0.length){ if(r0&&!g) return r0; return r0; }
-  const now=nowMin(); let r=[...r0]; r.gps=r0.gps; r.veh=r0.veh; r.planned=g?false:r0.planned;
-  // İETT'nin tahmini uzak otobüste erken kalıyor (ölçüm: 10–20 dk'da ort. ~4,7 dk): uzaklıkla artan pay ekle
-  if(!g) r=Object.assign(r.map(t=>t+Math.max(0,(t-now)-5)*0.3),{planned:r.planned});
+  const g=gpsEta(sid,b); if(!g||!g.length) return null;
+  const now=nowMin(), it=liveIett(sid,b)||[];
+  let r=g.map(t=>{ if(t-now>8) return t; const m=it.filter(x=>Math.abs(x-t)<=3).sort((p,q)=>Math.abs(p-t)-Math.abs(q-t))[0]; return m!==undefined?m:t; });
+  const veh=g.veh; const ord=r.map((t,i)=>i).sort((p,q)=>r[p]-r[q]);
+  r=Object.assign(ord.map(i=>r[i]),{gps:true,planned:false,veh:ord.map(i=>veh[i])});
   const D=dirOf(sid,b);
-  if(D&&driftCheck(sid+"|"+b,r0[0],now)){
+  // Kayma: ilk aracın tahmini dakikalardır ileri kayıyorsa ilerlemiyordur (hat başında/molada): tarifeye bağla
+  if(D&&driftCheck(sid+"|"+b,g[0],now)&&r.veh[0]){
     const x=D.x, sch=depsToday(x).map(t=>t+x.o[D.p]).find(t=>t>=r[0]-1);
-    if(sch!==undefined&&sch-r[0]<=45&&sch>r[0]){ r[0]=sch; r.sort((a,c)=>a-c); }
-    r.bekliyor=true;
+    r.veh[0]={...r.veh[0],bekliyor:true};
+    if(sch!==undefined&&sch-r[0]<=45&&sch>r[0]){ r[0]=sch;
+      const o2=r.map((t,i)=>i).sort((p,q)=>r[p]-r[q]), v2=r.veh; r=Object.assign(o2.map(i=>r[i]),{gps:true,planned:false,veh:o2.map(i=>v2[i])}); }
   }
+  if(r.veh[0]&&r.veh[0].bekliyor) r.bekliyor=true;                 // gelecek ilk araç duruyor: saat tarifedeki kalkışından
   r.trf=r.bekliyor?0:trafLevel(sid,b,r[0]);
   return r;
 }
