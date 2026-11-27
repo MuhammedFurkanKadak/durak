@@ -357,7 +357,7 @@ const EN={
 "Havalimanı":"Airport","İstanbul Havalimanı":"Istanbul Airport","Sabiha Gökçen":"Sabiha Gökçen",
 "Havalimanındasın: şehirde nereye gideceğini yaz.":"You're at the airport: type where you're going in the city.",
 "Havalimanı otobüsleri (IST: Havaist, SAW: Havabüs) ayrı ücretlidir ve bu rotalarda gösterilmez.":"Airport coaches (IST: Havaist, SAW: Havabüs) have their own fares and aren't shown in these routes.",
-"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı konum":"live position","{0} aracı erken geçiyor, yetişemezsin; sonraki gösteriliyor":"{0} passes early, you can't make it; showing the next one","canlıda {0}'de geçen araca yetişemezsin, bu sonraki sefer":"you can't catch the one passing at {0} (live); this is the next trip","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
+"Havaist saatleri":"Havaist timetable","Canlıda araç görünmüyor, sefer yapılmayabilir":"No vehicle in live data — trip may not run","canlıda araç yok":"no vehicle live","yarın {0}":"tomorrow {0}","yarın":"tomorrow","Yarın {0}'de çık":"Leave tomorrow {0}","Bu gece sefer yok. Yarın {0}'de yola çık":"No service tonight. Leave tomorrow at {0}","Yarın {0}'de geçiyor (ilk sefer)":"Tomorrow at {0} (first trip)","Canlı":"Live","Minibüs":"Minibus","Dolmuş":"Dolmuş","Yolda trafik":"Traffic on route","akıyor":"flowing","yavaş":"slow","sıkışık":"jammed","Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.":"On roads with bus service, from the speed of buses there in the last few minutes. Uncoloured parts are flowing or have no data.","Trafik":"Traffic","canlı konum":"live position","araç bekliyor, tarifedeki kalkışına göre":"vehicle waiting; based on its scheduled departure","araç bekliyor":"vehicle waiting","Araç bekliyor; tarifeye göre {0} sonra":"Vehicle waiting; scheduled in {0}","{0} aracı erken geçiyor, yetişemezsin; sonraki gösteriliyor":"{0} passes early, you can't make it; showing the next one","canlıda {0}'de geçen araca yetişemezsin, bu sonraki sefer":"you can't catch the one passing at {0} (live); this is the next trip","canlı":"live","Canlı: araç {0} sonra durakta":"Live: vehicle at the stop in {0}","sonraki":"next"
 };
 function T(s,...a){ let r=(LANG==="en"&&EN[s]!==undefined)?EN[s]:s; a.forEach((v,i)=>{ r=r.split("{"+i+"}").join(v); }); return r; }
 const yonT=y=>LANG==="en"?"to "+y:y+" yönü";
@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271930";
+const APP_VERSION="202611271945";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1378,7 +1378,7 @@ function planCard(o,k,now){
   const tg=(o.tags||[]).map(t=>`<span class="tag">${T(t)}</span>`).join("");
   const fr=fareOf(o);
   const meta=o.walk?"":` · 🚶 ${mt.walk>=1000?(mt.walk/1000).toFixed(1)+" km":mt.walk+" m"}`;
-  const lvb=o.walk||!o.legs?"":o.legs.some(g=>g.lv==="nolive")?`<div class="lvwarn">⚠️ ${T("Canlıda araç görünmüyor, sefer yapılmayabilir")}</div>`:o.legs[0].lv==="live"?`<span class="lv" style="display:inline;margin-right:6px"><i class="ld"></i>${T("canlı")} ·</span>`:"";
+  const lvb=o.walk||!o.legs?"":o.legs.some(g=>g.lv==="nolive")?`<div class="lvwarn">⚠️ ${T("Canlıda araç görünmüyor, sefer yapılmayabilir")}</div>`:o.legs[0].lv==="live"?`<span class="lv" style="display:inline;margin-right:6px"><i class="ld"></i>${T("canlı")} ·</span>`:o.legs[0].lv==="wait"?`<span class="lvw" style="margin-right:6px">⏸ ${T("araç bekliyor")} ·</span>`:"";
   return `<div class="pcard" data-open="${k}"><div class="main">${tg?`<div class="tags">${tg}</div>`:""}<div class="chain">${chain(o,false,true)}</div><div class="sub">${lvb.startsWith("<span")?lvb:""}${sub}${meta}</div>${lvb.startsWith("<div")?lvb:""}</div>
     <div class="dur">${dkBig(mt.dur)}<span>${isTomorrow(mt.leave,now)?T("yarın")+" ":""}${fmt(mt.leave)}–${fmt(o.arr)}</span>${o.walk?"":`<span class="fare">${tl(fr.total,fr.approx)}</span>`}</div><span class="chev">›</span></div>`;
 }
@@ -1523,7 +1523,7 @@ function openPlan(k){
       <div class="step s-ride" style="--c:${lc(s.Ln)}"><div class="ic"><span class="cb${bt(s.Ln).length>4?" long":""}" style="background:${lc(s.Ln)}">${bt(s.Ln)}</span></div>
         <div class="tx"><b>${T("Bin:")} ${esc(s.on)}</b><span>${yonT(esc(s.yon))} · ${esc(s.Ln.n)}</span>${(ri++,FR.legs[ri])?`<span class="fpill">${FR.legs[ri].f===0?T("ücretsiz aktarma"):tl(FR.legs[ri].f,FR.legs[ri].ap)+" · "+T("tam bilet")}</span>`:""}
           <span class="lv" data-lsid="${s.x.s[s.g.from]}" data-lb="${esc(s.Ln.b)}" data-lplan="1"></span>
-          <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):(isTomorrow(s.t,now)?T("Yarın {0}'de geçiyor (ilk sefer)",fmt(s.t)):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now)))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${s.g.lv==="live"?`<b class="livet">${T("canlı")}</b>`:s.g.lv==="nolive"?`<b class="lvw">⚠️ ${T("canlıda araç yok")}</b>`:T("tarifeye göre")}</span>
+          <span class="wait">${s.first?(s.t-now<=1?T("Şimdi kalkıyor"):(isTomorrow(s.t,now)?T("Yarın {0}'de geçiyor (ilk sefer)",fmt(s.t)):T("{0}'de kalkıyor ({1} sonra)",fmt(s.t),dk(s.t-now)))):(s.bekle?T("{0} bekleme",dk(s.bekle)):T("Hemen aktarma"))} · ${s.g.lv==="live"?`<b class="livet">${T("canlı")}</b>`:s.g.lv==="wait"?`<b class="lvw">${T("araç bekliyor, tarifedeki kalkışına göre")}</b>`:s.g.lv==="nolive"?`<b class="lvw">⚠️ ${T("canlıda araç yok")}</b>`:T("tarifeye göre")}</span>
           ${s.ara.length?`<details><summary>${s.ara.length+1} ${T("durak")} · ~${dk(s.dk)}</summary><ol class="ara">${s.ara.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>`:`<span>1 ${T("durak")} · ~${dk(s.dk)}</span>`}
           <b style="margin-top:6px">${T("İn:")} ${esc(s.off)}</b></div>
         <div class="tm">${fmt(s.t)}<br><br><br>${fmt(s.end)}</div></div>`).join("")}
@@ -1625,9 +1625,30 @@ function gpsEta(sid,b){
   if(!out.length) return null;
   out.sort((a,b)=>a[0]-b[0]); const r=out.map(o=>o[0]); r.veh=out.map(o=>o[1]); r.gps=true; return r;
 }
+// Tahmin kayması: aynı otobüsün tahmini varışı, geçen zamanın %60'ından hızlı ileri kayıyorsa otobüs ilerlemiyor
+// (hat başında, molada ya da kalkış saatini bekliyor). O zaman tarifedeki saatinden önce gelmez.
+const DRIFT={};
+function driftCheck(key,first,now){
+  const h=DRIFT[key]||(DRIFT[key]=[]);
+  if(h.length&&Math.abs(first-h[h.length-1][1])>20) h.length=0;          // başka otobüse geçti
+  if(!h.length||now-h[h.length-1][0]>=0.5) h.push([now,first]);
+  while(h.length&&now-h[0][0]>15) h.shift();
+  const old=h.find(e=>now-e[0]>=4); if(!old) return false;
+  return (first-old[1])/(now-old[0])>=0.6;
+}
 function liveFor(sid,b){
-  const g=gpsEta(sid,b); if(g){ g.planned=false; return g; }
-  return liveIett(sid,b);
+  const g=gpsEta(sid,b), r0=g||liveIett(sid,b);
+  if(!r0||!r0.length){ if(r0&&!g) return r0; return r0; }
+  const now=nowMin(); let r=[...r0]; r.gps=r0.gps; r.veh=r0.veh; r.planned=g?false:r0.planned;
+  // İETT'nin tahmini uzak otobüste erken kalıyor (ölçüm: 10–20 dk'da ort. ~4,7 dk): uzaklıkla artan pay ekle
+  if(!g) r=Object.assign(r.map(t=>t+Math.max(0,(t-now)-5)*0.3),{planned:r.planned});
+  const D=dirOf(sid,b);
+  if(D&&driftCheck(sid+"|"+b,r0[0],now)){
+    const x=D.x, sch=depsToday(x).map(t=>t+x.o[D.p]).find(t=>t>=r[0]-1);
+    if(sch!==undefined&&sch-r[0]<=45&&sch>r[0]){ r[0]=sch; r.sort((a,c)=>a-c); }
+    r.bekliyor=true;
+  }
+  return r;
 }
 // ---- Doğruluk ölçümü: gösterilen tahminleri (GPS ve İETT ayrı ayrı) sunucuya kaydet; gerçek varışla sonra kıyaslanır
 const OLC_T={};
@@ -1671,7 +1692,7 @@ function retimeLive(o){
     const lt=isIETT?liveFor(sid,Ln.b):null;
     if(lt){
       const a=lt.find(t=>t>=earliest-0.5);
-      if(a!==undefined){ board=a; lv="live"; }
+      if(a!==undefined){ board=a; lv=lt.bekliyor&&a===lt[0]?"wait":"live"; }
       // İETT otobüsü 25 dk içinde gelmeliydi ama canlıda yok (ve "B" ile planlı da görünmüyor): uyar.
       // Minibüslerin çoğu İETT canlı verisinde hiç yok; onlarda yokluk bir şey ifade etmez.
       else if(Ln.a==="İETT"&&!lt.planned&&board-now<=25){ lv="nolive"; }
@@ -1736,7 +1757,8 @@ async function liveRefresh(){
     if(!items.length){ lvEl.innerHTML=""; delete e.dataset.lt; return; }
     const mins=items.slice(0,3).map(it=>it.dk<=0?T("şimdi"):it.dk+DK());
     if(lt&&lt.gps) e.dataset.gps=1; else delete e.dataset.gps;
-    if(e.dataset.lplan) lvEl.innerHTML=`<i class="ld"></i>${T("Canlı: araç {0} sonra durakta",items[0].dk<=0?T("şimdi"):dk(items[0].dk))}${items.length>1?` · ${T("sonraki")} ${mins.slice(1).join(", ")}`:""}`;
+    if(lt&&lt.bekliyor) lvEl.innerHTML=`⏸ ${T("Araç bekliyor; tarifeye göre {0} sonra",items[0].dk<=0?T("şimdi"):dk(items[0].dk))}${items.length>1?` · ${T("sonraki")} ${mins.slice(1).join(", ")}`:""}`;
+    else if(e.dataset.lplan) lvEl.innerHTML=`<i class="ld"></i>${T("Canlı: araç {0} sonra durakta",items[0].dk<=0?T("şimdi"):dk(items[0].dk))}${items.length>1?` · ${T("sonraki")} ${mins.slice(1).join(", ")}`:""}`;
     else { lvEl.innerHTML=`<i class="ld"></i>${T("Canlı")}: ${mins.join(", ")}`;
       const m=e.querySelector(".m"); if(m) m.innerHTML=`${items[0].dk<=0?T("Şimdi"):dk(items[0].dk)}<small class="livet">${T("canlı")}</small>`;
       e.dataset.lt=nowMin()+items[0].dk; }
