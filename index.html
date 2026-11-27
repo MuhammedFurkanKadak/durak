@@ -429,7 +429,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611271130";
+const APP_VERSION="202611271125";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1428,8 +1428,11 @@ async function streetWalk(s,pl,k){
 let TRAF_ON=(()=>{ try{ return localStorage.getItem("durak-trafik")!=="0"; }catch(e){ return true; } })();
 const ROADT=new Set(["otobus","minibus","dolmus","metrobus"]);
 const trafColor=sp=>sp==null||sp>=25?null:sp>=15?"#f0a202":"#d7263d";   // akan yol işaretlenmez: sadece yavaş ve sıkışık
+// Otobüs hızından trafik rengi yanıltıcı çıktı (otobüs durakta durduğu için akan yolda da yavaş görünüyor);
+// gerçek trafik kaynağı bağlanana kadar kapalı.
+const TRAF_ENABLED=false;
 function drawTraffic(ss){
-  if(!trafLayer) return; trafLayer.clearLayers();
+  if(!trafLayer) return; trafLayer.clearLayers(); if(!TRAF_ENABLED) return;
   if(!TRAF_ON||CITYK!=="ist"||!HIZ) return;
   ss.forEach(s=>{
     if(s.k==="walk"||!ROADT.has(s.Ln.t)) return;
@@ -1458,7 +1461,7 @@ function buildRoadSeg(){
       (ROADSEG[ck]||(ROADSEG[ck]=[])).push([a,b,m]); } }); });
 }
 function drawCityTraffic(){
-  if(!cityTraf) return; cityTraf.clearLayers();
+  if(!cityTraf) return; cityTraf.clearLayers(); if(!TRAF_ENABLED) return;
   if(!TRAF_ON||CITYK!=="ist"||!HIZ||M.sel===null) return;
   if(!ROADSEG) buildRoadSeg();
   const B=map.getBounds().pad(.1), y=[], r=[];
@@ -1480,7 +1483,7 @@ document.addEventListener("change",e=>{ if(e.target.id!=="trafon") return; TRAF_
   try{ localStorage.setItem("durak-trafik",TRAF_ON?"1":"0"); }catch(_){}
   if(M.sel!==null&&M.plans&&M.plans[M.sel]){ drawTraffic(steps(M.plans[M.sel])); drawCityTraffic(); } });
 function trafficLegend(o){
-  if(CITYK!=="ist"||!o.legs||!o.legs.some(g=>ROADT.has(LINES[g.li].t))) return "";
+  if(!TRAF_ENABLED||CITYK!=="ist"||!o.legs||!o.legs.some(g=>ROADT.has(LINES[g.li].t))) return "";
   return `<label class="traf"><input type="checkbox" id="trafon" ${TRAF_ON?"checked":""}> ${T("Trafik")}
     <i style="background:#f0a202"></i>${T("yavaş")} <i style="background:#d7263d"></i>${T("sıkışık")}
     <small>${T("Otobüs geçen yollarda, son dakikalarda oradan geçen otobüslerin hızından. Renksiz yerler akıyor ya da veri yok.")}</small></label>`;
