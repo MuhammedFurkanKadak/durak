@@ -431,7 +431,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611272330";
+const APP_VERSION="202611272345";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1664,18 +1664,23 @@ const trfTxt=k=>k===2?T("yoğun trafik"):k===1?T("trafik var"):"";
 const trfQ=k=>k?"~":"";
 // Trafik seviyesi: durağa gelmeden önceki yolda (tahmini süre kadar geriye) otobüslerin şu anki hızıyla geçiş
 // süresi, tarifedeki normal süreye göre ne kadar uzun? 0 normal, 1 yavaş (%50+), 2 sıkışık (2 katı+). Veri azsa 0.
-// İBB trafik merkezinin (UYM) araç trafiği: hücredeki en kötü yoğunluk 1 akıcı … 5 tıkalı
-function cellUym(p){
-  const U=HIZ&&HIZ.u; if(!U||Date.now()-U.t>10*60000) return null;
-  const c=U.g[Math.floor(p[0]/0.003)+":"+Math.floor(p[1]/0.004)]; return c?c[1]:null;
+// İBB trafik merkezinin (UYM) araç trafiği: 1 akıcı … 5 tıkalı. Her yön ayrı tutulur; yalnız otobüsün gittiği
+// yöne (±40°) uyan şerit sayılır, karşı yön asla karışmaz. Uyan şerit yoksa veri yok sayılır.
+const yonAci=(a,b)=>((Math.atan2((b[1]-a[1])*Math.cos(a[0]*Math.PI/180),b[0]-a[0])*180/Math.PI)+360)%360;
+function cellUym(p,yon){
+  const U=HIZ&&HIZ.u; if(!U||U.v!==2||Date.now()-U.t>10*60000) return null;
+  const e=U.g[Math.floor(p[0]/0.003)+":"+Math.floor(p[1]/0.004)]; if(!e) return null;
+  const m=e.filter(([y])=>{ const d=Math.abs(y*10-yon)%360; return Math.min(d,360-d)<=40; });
+  return m.length?m.reduce((t,x)=>t+x[1],0)/m.length:null;
 }
 function trafLevel(sid,b,eta){
   const D=dirOf(sid,b); if(!D) return 0; const x=D.x, need=Math.max(3,eta-nowMin());
   // Önce UYM: yolun (süreye göre ağırlıklı) ortalama yoğunluğu. Yetersizse otobüs hızına bak.
   { let acc=0, w=0, cs=0;
     for(let i=D.p;i>0&&acc<need;i--){ const A=STOPS[x.s[i-1]].p,B=STOPS[x.s[i]].p, n=Math.max(0.5,x.o[i]-x.o[i-1]); acc+=n;
-      const c=[A,[(A[0]+B[0])/2,(A[1]+B[1])/2],B].map(cellUym).filter(v=>v!=null); if(!c.length) continue;
-      w+=n; cs+=n*Math.max(...c); }
+      if(hav(A,B)<30) continue; const yn=yonAci(A,B);
+      const c=[A,[(A[0]+B[0])/2,(A[1]+B[1])/2],B].map(q=>cellUym(q,yn)).filter(v=>v!=null); if(!c.length) continue;
+      w+=n; cs+=n*c.reduce((p,q)=>p+q,0)/c.length; }
     if(w>=Math.min(need,8)*0.4){ const m=cs/w; return m>=4?2:m>=3.3?1:0; } }
   let acc=0, sch=0, cur=0;
   for(let i=D.p;i>0&&acc<need;i--){ const A=STOPS[x.s[i-1]].p,B=STOPS[x.s[i]].p, n=Math.max(0.5,x.o[i]-x.o[i-1]); acc+=n;
