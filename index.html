@@ -226,9 +226,9 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .pop b{display:block;margin-bottom:6px}
 .pop button{font:inherit;font-size:12.5px;font-weight:700;border:none;border-radius:8px;padding:6px 10px;margin:2px 4px 0 0;cursor:pointer;background:var(--brand);color:var(--brand-ink)}
 .pop button.g{background:#eee;color:#222}
-.apt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.apt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0}
 /* Son yolculuklar: yatay kaydırmalı kartlar */
-.tslide{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px 4px;scrollbar-width:none}
+.tslide{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 4px;margin:0 -2px -4px;scrollbar-width:none}
 .tslide::-webkit-scrollbar{display:none}
 .tcard{flex:0 0 78%;max-width:300px;scroll-snap-align:start;position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 44px 14px 16px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .tcard .tr{display:flex;gap:10px;align-items:stretch}
@@ -445,7 +445,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611281300";
+const APP_VERSION="202611281305";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -709,7 +709,7 @@ function homeHTML(){
   const hs=LINES.filter(L=>isFav("h",L.id));
   let h=airportHTML();
   // Son 5 yolculuk: yatay kaydırmalı kartlar
-  h+=`<h3 class="sec" style="margin-top:6px">${T("Son yolculuklar")}</h3>`+(recent.length?`<div class="tslide">${recent.slice(0,5).map((t,i)=>{ const on=fav.r.some(x=>tripKey(x)===tripKey(t));
+  h+=`<h3 class="sec">${T("Son yolculuklar")}</h3>`+(recent.length?`<div class="tslide">${recent.slice(0,5).map((t,i)=>{ const on=fav.r.some(x=>tripKey(x)===tripKey(t));
     return `<div class="tcard" data-trip="${i}"><div class="tr"><div class="rail"><i></i><span></span><i class="b"></i></div><div class="nm"><small>${esc(nmE(t.a))}</small><b>${esc(nmE(t.b))}</b></div></div>${t.t?`<div class="ag">${ago(t.t)}</div>`:""}
       <button class="star ${on?"on":""}" data-ftrip="data-trip:${i}" aria-label="${T("Favorilere ekle")}">${on?"★":"☆"}</button></div>`; }).join("")}</div>`
     :`<div class="list"><div class="empty" style="padding:16px">${T("Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.")}</div></div>`);
