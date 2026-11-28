@@ -431,7 +431,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611272355";
+const APP_VERSION="202611281230";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -1452,6 +1452,27 @@ async function streetWalk(s,pl,k){
     const el=document.querySelector(`[data-wk="${key}"]`); if(el) el.textContent=`${w.m} m · ~${dk(walkMin(w.m/1.3))}`;
   }catch(e){}
 }
+// Karayolu ayağını gerçek yola oturt: elimizdeki şekil yoksa (otobüs: durak→durak düz çizgi) ya da kaba ise
+// (minibüs: 1,5 km'lik düz parçalar binaların içinden geçiyordu) durakları sırayla araç yolu üzerinden bağla.
+// approaches=curb: her durağa kendi şeridinden (sağdan) yaklaşır, karşı yön şeridine kayıp dolanmaz.
+// Sonuç şüpheliyse (bir ara durak arası düz mesafenin çok üstündeyse) eski çizim kalır.
+const roadCache={};
+async function roadLeg(s,lines,k){
+  if(!ROADT.has(s.Ln.t)||s.Ln.t==="metrobus") return;
+  const key=s.g.li+"|"+s.g.di+"|"+s.g.from+"|"+s.g.to;
+  try{
+    if(roadCache[key]===undefined){
+      roadCache[key]=null;
+      const ps=s.x.s.slice(s.g.from,s.g.to+1).map(id=>STOPS[id].p); if(ps.length<2||ps.length>60) return;
+      const u=`https://routing.openstreetmap.de/routed-car/route/v1/driving/${ps.map(p=>p[1].toFixed(6)+","+p[0].toFixed(6)).join(";")}?overview=full&geometries=geojson&approaches=${ps.map(()=>"curb").join(";")}`;
+      const j=await (await fetch(u)).json(); if(j.code!=="Ok") return;
+      const R=j.routes[0]; if(!R.legs.every((lg,i)=>lg.distance<=hav(ps[i],ps[i+1])*2.2+350)) return;
+      roadCache[key]=R.geometry.coordinates.map(c=>[c[1],c[0]]);
+    }
+    const pts=roadCache[key]; if(!pts||M.sel!==k) return;
+    lines.forEach(l=>l.setLatLngs(pts));
+  }catch(e){}
+}
 // Detay: harita + adım adım tarif
 // ================= TRAFİK (seçilen güzergâhta) =================
 // Kaynak: o yoldan son dakikalarda geçen otobüslerin hızı (İBB filo verisi). Yalnız karayolu ayaklarında, veri olan yerde.
@@ -1527,8 +1548,9 @@ function openPlan(k){
   ss.forEach(s=>{
     if(s.k==="walk"){ if(s.m>5){ const pl=L.polyline([s.from,s.to],{color:"#6b7078",weight:4,dashArray:"1 9",lineCap:"round",interactive:false}).addTo(routeLayer); if(s.m>60) streetWalk(s,pl,k); } return; }
     const path=legPath(s.x,s.g.from,s.g.to), c=lc(s.Ln);
-    L.polyline(path,{color:"#fff",weight:10,opacity:1,interactive:false}).addTo(routeLayer);
-    L.polyline(path,{color:c,weight:6,opacity:1,interactive:false}).addTo(routeLayer);
+    const plW=L.polyline(path,{color:"#fff",weight:10,opacity:1,interactive:false}).addTo(routeLayer);
+    const plC=L.polyline(path,{color:c,weight:6,opacity:1,interactive:false}).addTo(routeLayer);
+    roadLeg(s,[plW,plC],k);
     s.x.s.slice(s.g.from,s.g.to+1).forEach((sid,i,arr)=>{const end=i===0||i===arr.length-1;
       L.circleMarker(STOPS[sid].p,{radius:end?6:3,color:c,weight:end?3:2,fillColor:"#fff",fillOpacity:1}).bindTooltip(STOPS[sid].n).addTo(routeLayer);});
     L.marker(path[0],{icon:L.divIcon({className:"",html:`<span class="cb" style="background:${c};box-shadow:0 1px 4px rgba(0,0,0,.35);border:2px solid #fff;transform:translate(10px,-24px);display:inline-block">${bt(s.Ln)}</span>`,iconSize:[0,0]}),interactive:false}).addTo(routeLayer);
