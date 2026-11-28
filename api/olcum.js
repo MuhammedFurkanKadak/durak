@@ -67,11 +67,15 @@ module.exports = async (req, res) => {
     const kova = m => m < 5 ? "0-5 dk" : m < 10 ? "5-10 dk" : m < 20 ? "10-20 dk" : "20+ dk";
     const top = { g: {}, i: {}, h2: {}, av: {}, a: {} }, hat = {}; let olculen = 0, bekleyen = 0, kapsamDisi = 0;
     const neden = { hat_henuz_izlenmiyordu: 0, iz_boslugu: 0, otobus_gelmedi: 0 }, gelmeyen = {};
+    // Hayalet sayımı: kaynağın "geliyor" dediği kayıtlardan kaçında 60 dk içinde hiç otobüs gelmedi
+    const hay = { g: [0, 0], i: [0, 0], a: [0, 0] }; let yeniKayit = 0, canliYok = 0;
+    const haySay = (r, geldi) => { for (const k of ["g", "i", "a"]) if (r[k]) { hay[k][0]++; if (!geldi) hay[k][1]++; } };
     // ?bas=2026-11-27T11:20 gibi: yalnız bu andan (İstanbul saati) sonraki tahminler
     const bas = req.query.bas ? Date.parse(String(req.query.bas) + "+03:00") : 0;
     for (const s of olc || []) {
       const r = JSON.parse(s);
       if (bas && r.t0 < bas) continue;
+      if ("a" in r) { yeniKayit++; if (r.a == null) canliYok++; }
       if (r.t0 < izIlk || !hatIlk[r.h] || r.t0 < hatIlk[r.h] + 60000) { kapsamDisi++; neden.hat_henuz_izlenmiyordu++; continue; }   // bu hat o an henüz izlenmiyordu
       const araclar = Object.values(T[r.h] || {}).filter(a => !a.y || !r.y || nrm(a.y) === nrm(r.y) || nrm(a.y).includes(nrm(r.y)) || nrm(r.y).includes(nrm(a.y)));
       let gercek = null; for (const a of araclar) { const t = gecis(r, a.p); if (t && (!gercek || t < gercek)) gercek = t; }
@@ -80,11 +84,12 @@ module.exports = async (req, res) => {
         if (bosluk(r.t0, r.t0 + 60 * 60000)) { kapsamDisi++; neden.iz_boslugu++; continue; }
         // İz kesintisizdi ama 60 dk içinde o yönde hiçbir otobüs durağı geçmedi: tahmin edilen araç gelmedi
         kapsamDisi++; neden.otobus_gelmedi++;
-        const gk = (gelmeyen[r.h] || (gelmeyen[r.h] = { adet: 0, gps: 0, iett: 0 })); gk.adet++; if (r.g) gk.gps++; if (r.i) gk.iett++;
+        const gk = (gelmeyen[r.h] || (gelmeyen[r.h] = { adet: 0, gps: 0, iett: 0, uygulama: 0 })); gk.adet++; if (r.g) gk.gps++; if (r.i) gk.iett++; if (r.a) gk.uygulama++;
+        haySay(r, false);
         continue;
       }
       if (bosluk(r.t0, gercek)) { kapsamDisi++; neden.iz_boslugu++; continue; }
-      olculen++;
+      olculen++; haySay(r, true);
       r.h2 = r.i || r.g;   // hibrit: İETT tahmini varsa o, yoksa GPS
       r.av = r.i && r.g ? (r.i + r.g) / 2 : (r.i || r.g);   // ikisi varsa ortalaması
       for (const src of ["g", "i", "h2", "av", "a"]) {
@@ -99,6 +104,8 @@ module.exports = async (req, res) => {
       aciklama: "iki_dk_icinde_yuzde = tahminin gerçek varışa ±2 dk içinde tuttuğu kayıtların oranı (hedef bu); sapma = |tahmin - gerçek varış|; eğilim + ise tahmin geç (araç tahminden önce geldi), - ise erken",
       kayit: (olc || []).length, son_kayit: (() => { try { return new Date(JSON.parse(olc[0]).t0 + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " "); } catch (e) { return null; } })(), son_iz: izSon ? new Date(izSon + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null, olculen, bekleyen, kapsamDisi, kapsam_disi_nedenleri: neden,
       izlenen_hat: Object.keys(T).length, iz_hata: izHata, iz_anlik: anlar.length, iz_baslangic: izIlk < Infinity ? new Date(izIlk + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null,
+      hayalet: Object.fromEntries([["gps", "g"], ["iett", "i"], ["uygulama_ekrandaki", "a"]].map(([ad, k]) => [ad, { geliyor_dedi: hay[k][0], hic_gelmedi: hay[k][1], oran_yuzde: hay[k][0] ? Math.round(hay[k][1] / hay[k][0] * 100) : null }])),
+      uygulama_canli_gostermedi: { yeni_kayit: yeniKayit, canli_yok_tarife_gosterildi: canliYok },
       tahmin_edilip_gelmeyen: gelmeyen,
       bas: bas ? new Date(bas + 3 * 3600e3).toISOString().slice(0, 16).replace("T", " ") : null,
       uygulama_ekrandaki: ozet(top.a), gps_trafik: ozet(top.g), iett: ozet(top.i), hibrit_iett_yoksa_gps: ozet(top.h2), ortalama_iett_gps: ozet(top.av),
