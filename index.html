@@ -227,6 +227,20 @@ h3.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--
 .pop button{font:inherit;font-size:12.5px;font-weight:700;border:none;border-radius:8px;padding:6px 10px;margin:2px 4px 0 0;cursor:pointer;background:var(--brand);color:var(--brand-ink)}
 .pop button.g{background:#eee;color:#222}
 .apt{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+/* Son yolculuklar: yatay kaydırmalı kartlar */
+.tslide{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px 4px;scrollbar-width:none}
+.tslide::-webkit-scrollbar{display:none}
+.tcard{flex:0 0 78%;max-width:300px;scroll-snap-align:start;position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 44px 14px 16px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.tcard .tr{display:flex;gap:10px;align-items:stretch}
+.tcard .rail{width:10px;display:flex;flex-direction:column;align-items:center;padding:5px 0}
+.tcard .rail i{width:9px;height:9px;border-radius:50%;border:2px solid var(--brand);background:var(--card);flex:none}
+.tcard .rail i.b{background:var(--brand)}
+.tcard .rail span{flex:1;width:2px;background:color-mix(in srgb,var(--brand) 35%,transparent);margin:2px 0;min-height:10px}
+.tcard .nm{display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-width:0}
+.tcard .nm small{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard .nm b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard .ag{font-size:12px;color:var(--muted);font-weight:600}
+.tcard .star{position:absolute;top:8px;right:8px}
 .apt button{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font:inherit;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;gap:2px}
 .apt button b{font-size:14px}
 .apt button small{font-size:12px;color:var(--muted);font-weight:600}
@@ -319,7 +333,7 @@ const EN={
 "Yolculuklar":"Trips","Nasıl Giderim'deki son yolculuklarda ☆'a dokunarak ekle.":"Add one by tapping ☆ on a recent trip in Directions.",
 "Hat sayfasında ☆'a dokunarak ekle.":"Add one by tapping ☆ on a line page.","Durak sayfasında ☆'a dokunarak ekle.":"Add one by tapping ☆ on a stop page.",
 "az önce":"just now","{0} dk önce":"{0} min ago","{0} sa önce":"{0} h ago","dün":"yesterday","{0} gün önce":"{0} days ago",
-"Konumum":"My location","📍 Konumum":"📍 My location","Nereden:":"From:","Favorilere ekle":"Add to favorites","Son yolculuklar":"Recent trips",
+"Konumum":"My location","📍 Konumum":"📍 My location","Nereden:":"From:","Favorilere ekle":"Add to favorites","Son yolculuklar":"Recent trips","Son gidilen yerler":"Recent places","Konumumdan git":"Go from my location",
 "Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.":"No trips yet. Choose where to go above.","Durak · buraya git":"Stop · go here","Favoriden çıkar":"Remove from favorites",
 "Son yolculuklardaki ☆ ile sık gittiğin yerleri buraya ekle.":"Use ☆ on recent trips to add places you go often.",
 "{0} yakını":"Near {0}","Seçilen nokta":"Selected point","Buraya git":"Go here","Buradan başla":"Start here","Saatler":"Times",
@@ -431,7 +445,7 @@ document.getElementById("homeback").onclick=()=>{ if(history.state&&history.stat
 // ================= OTOMATİK GÜNCELLEME =================
 // Ana ekrandan açılan uygulama arka planda açık kalabildiği için eski sürümde kalabiliyor.
 // Uygulamaya her dönüldüğünde yeni sürüm var mı bakılır; varsa sayfa kendini yeniler.
-const APP_VERSION="202611281230";
+const APP_VERSION="202611281300";
 async function checkUpdate(){
   try{
     const t=await fetch("/index.html?v="+Date.now(),{cache:"no-store"}).then(r=>r.text());
@@ -653,13 +667,26 @@ let recent=[]; try{ recent=JSON.parse(localStorage.getItem("durak-son"+CITY.sfx)
 if(!fav.r) fav.r=[];
 const ME="📍 Konumum";
 const endOf=w=>w==="from"?{ll:M.A,n:M.Aname,st:!!M.Aids}:{ll:M.B,n:M.Bname,st:!!M.Bids};
-const pk=e=>e.n===ME?ME:e.n+"@"+e.ll.map(x=>(+x).toFixed(4)).join(",");
+// "Konumum"dan çıkılan yolculuklar o anki konumun gerçek adıyla saklanır (me:1). Aynı yer sayılması için ~100 m'ye yuvarla.
+const pk=e=>e.n===ME?ME:e.me?"me@"+e.ll.map(x=>(+x).toFixed(3)).join(","):e.n+"@"+e.ll.map(x=>(+x).toFixed(4)).join(",");
 const tripKey=t=>pk(t.a)+">"+pk(t.b);
+// Son gidilen yerler: yolculuklardan bağımsız, en son gidilen 8 farklı varış noktası (Konumum'dan gidilir)
+let places=[]; try{ places=JSON.parse(localStorage.getItem("durak-yer"+CITY.sfx))||null; }catch(e){}
+if(!Array.isArray(places)) places=recent.map(t=>({...t.b,t:t.t})).filter(e=>e.n!==ME&&!e.me&&e.ll);
+const placeKey=e=>e.n+"@"+e.ll.map(x=>(+x).toFixed(3)).join(",");
+function savePlaces(){ try{ localStorage.setItem("durak-yer"+CITY.sfx,JSON.stringify(places)); }catch(e){} }
 function saveRecent(){
   if(!M.A||!M.B) return;
-  const t={a:endOf("from"),b:endOf("to"),t:Date.now()}, k=tripKey(t);
+  const me=e=>e.n===ME&&e.ll?{ll:e.ll,n:quickName(e.ll),st:false,me:1}:e;   // gerçek adı aşağıda gelir
+  const t={a:me(endOf("from")),b:me(endOf("to")),t:Date.now()}, k=tripKey(t);
   recent=[t,...recent.filter(x=>tripKey(x)!==k)].slice(0,6);
   try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(e){}
+  if(!t.b.me&&t.b.ll){ const pkb=placeKey(t.b); places=[{...t.b,t:t.t},...places.filter(p=>placeKey(p)!==pkb)].slice(0,8); savePlaces(); }
+  [t.a,t.b].forEach(e=>{ if(e.me) revName(e.ll).then(n=>{ if(n&&e.n!==n){ e.n=n; try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(x){} if(!M.plans&&!(M.A&&M.B)) renderPlans(); } }); });
+}
+function runPlace(p){
+  const go=()=>{ M.A=myLoc; M.Aname=ME; M.Aids=null; fromQ.value=""; setEnd("to",p.ll,p.n,p.st&&BYNAME[p.n]?group(p.n):null); };
+  if(!myLoc) return askLocation(go); go();
 }
 function saveFav(){ try{ localStorage.setItem("durak-fav2"+CITY.sfx,JSON.stringify(fav)); }catch(e){} }
 function toggleFavTrip(t){ const k=tripKey(t); fav.r=fav.r.some(x=>tripKey(x)===k)?fav.r.filter(x=>tripKey(x)!==k):[...fav.r,{a:t.a,b:t.b}]; saveFav(); renderPlans(); }
@@ -680,7 +707,14 @@ function tripRow(t,attr,i,isF){
 }
 function homeHTML(){
   const hs=LINES.filter(L=>isFav("h",L.id));
-  let h=airportHTML()+`<h3 class="sec" style="margin-top:6px">${T("Son yolculuklar")}</h3><div class="list">${recent.map((t,i)=>tripRow(t,"data-trip",i,false)).join("")||`<div class="empty" style="padding:16px">${T("Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.")}</div>`}</div>`;
+  let h=airportHTML();
+  // Son 5 yolculuk: yatay kaydırmalı kartlar
+  h+=`<h3 class="sec" style="margin-top:6px">${T("Son yolculuklar")}</h3>`+(recent.length?`<div class="tslide">${recent.slice(0,5).map((t,i)=>{ const on=fav.r.some(x=>tripKey(x)===tripKey(t));
+    return `<div class="tcard" data-trip="${i}"><div class="tr"><div class="rail"><i></i><span></span><i class="b"></i></div><div class="nm"><small>${esc(nmE(t.a))}</small><b>${esc(nmE(t.b))}</b></div></div>${t.t?`<div class="ag">${ago(t.t)}</div>`:""}
+      <button class="star ${on?"on":""}" data-ftrip="data-trip:${i}" aria-label="${T("Favorilere ekle")}">${on?"★":"☆"}</button></div>`; }).join("")}</div>`
+    :`<div class="list"><div class="empty" style="padding:16px">${T("Henüz yolculuk yok. Yukarıdan nereye gideceğini seç.")}</div></div>`);
+  if(places.length) h+=`<h3 class="sec">${T("Son gidilen yerler")}</h3><div class="list">${places.map((p,i)=>`<div class="item trip" data-yer="${i}"><span class="hico">${IC_PIN}</span><div class="t"><b>${esc(p.n)}</b><span>${T("Konumumdan git")}${p.t?" · "+ago(p.t):""}</span></div></div>`).join("")}</div>`;
+
   h+=`<h3 class="sec">${T("Favoriler")}</h3><div class="list">`;
   const items=fav.r.map((t,i)=>tripRow(t,"data-favtrip",i,true))
     .concat(fav.d.map(n=>`<div class="item trip" data-gostop="${esc(n)}"><span class="hico f">${IC_PIN}</span><div class="t"><b>${esc(n)}</b><span>${T("Durak · buraya git")}</span></div><button class="star on" data-fd="${esc(n)}" aria-label="${T("Favoriden çıkar")}">★</button></div>`));
@@ -691,7 +725,10 @@ function homeHTML(){
 }
 document.addEventListener("click",e=>{
   if(e.target.closest("[data-fd]")) return;
-  const b=e.target.closest("[data-ftrip],[data-trip],[data-favtrip],[data-gostop]"); if(!b) return;
+  const b=e.target.closest("[data-ftrip],[data-trip],[data-favtrip],[data-gostop],[data-yer]"); if(!b) return;
+  if(b.dataset.yer!==undefined){ e.stopPropagation(); const p=places[+b.dataset.yer]; if(!p) return;
+    if(!document.getElementById("plans").contains(b)){ hist=[]; go({tab:"rota",line:null,stop:null,q:""}); setTimeout(()=>runPlace(p),60); return; }
+    return runPlace(p); }
   // Favoriler sekmesinden: yolculuğa dokununca Nasıl Giderim'e geç ve rotayı hesapla
   if(!document.getElementById("plans").contains(b)){
     if(b.dataset.ftrip){ e.stopPropagation(); fav.r.splice(+b.dataset.ftrip.split(":")[1],1); saveFav(); render(); return; }
@@ -737,9 +774,14 @@ async function nameLater(w,ll){
 function fixSavedNames(ll,n){
   let ch=false;
   [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&e.n!==ME&&!e.st&&sameLL(e.ll,ll)&&e.n!==n){ e.n=n; ch=true; } }));
-  if(ch){ try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(e){} saveFav(); if(!M.plans&&!(M.A&&M.B)) renderPlans(); }
+  places.forEach(e=>{ if(e&&!e.st&&sameLL(e.ll,ll)&&e.n!==n){ e.n=n; ch=true; } });
+  if(ch){ try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(e){} saveFav(); savePlaces(); if(!M.plans&&!(M.A&&M.B)) renderPlans(); }
 }
 function fixOldNames(){
+  // Eski "Konumum" kayıtları: o anki konumun gerçek adını ver
+  let ch=false; [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&e.n===ME&&Array.isArray(e.ll)&&e.ll.length===2){ e.me=1; e.n=quickName(e.ll); ch=true;
+    revName(e.ll).then(n=>{ if(n){ e.n=n; try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(x){} saveFav(); if(!M.plans&&!(M.A&&M.B)) renderPlans(); } }); } }));
+  if(ch){ try{ localStorage.setItem("durak-son"+CITY.sfx,JSON.stringify(recent)); }catch(e){} saveFav(); }
   const todo=[]; [...recent,...(fav.r||[])].forEach(t=>[t.a,t.b].forEach(e=>{ if(e&&(e.n===GENERIC||e.n==="Seçilen nokta"||e.n==="Selected point")&&e.ll) todo.push(e.ll); }));
   todo.slice(0,8).forEach((ll,i)=>setTimeout(async()=>fixSavedNames(ll,await revName(ll)),300*i));
 }
@@ -2203,7 +2245,7 @@ function olcumModu(){
     bar.textContent=`Ölçüm modu · ${i}. açılış · ${STOPS[sid].n} · ${pick.length} durak sırayla · ${new Date().toLocaleTimeString("tr")}`; };
   step(); setInterval(step,45000);
 }
-loadData().then(()=>{ render(); olcumModu(); }).catch(e=>{app.innerHTML=`<div class="empty">${T("Veri yüklenemedi:")} ${esc(e.message)}</div>`;});
+loadData().then(()=>{ render(); olcumModu(); try{ fixOldNames(); }catch(e){} }).catch(e=>{app.innerHTML=`<div class="empty">${T("Veri yüklenemedi:")} ${esc(e.message)}</div>`;});
 </script>
 </body>
 </html>
