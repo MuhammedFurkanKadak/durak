@@ -132,7 +132,9 @@ module.exports = async (req, res) => {
           await pipe([["HSET", hk, ...set], ["EXPIRE", hk, 15 * 86400]]);
         }
       } catch (e) {}
-      // Hat eşleşmesi bilinen araçları hatlara dağıt (6 saatten eski eşleşme sayılmaz)
+      // Hat eşleşmesi bilinen araçları hatlara dağıt. Uygulama için eşleşme yalnız 40 dk geçerli: İETT'nin hat sorgusu
+      // yalnız o an seferde olan araçları verir; seferi bitip garaja/başka işe giden araç 6 saat boyunca hâlâ "73B" sayılıyordu
+      // ve uygulamada gelmeyecek bir araç olarak görünüyordu (ölçüm: gece "geliyor" denenlerin %58'i hiç gelmedi).
       const [kapiFlat, olc, eskiS] = await pipe([["HGETALL", "kapi"], ["ZRANGEBYSCORE", "olch", Date.now() - 5400000, "+inf"], ["GET", "hatf"]]);
       // Bir önceki filo turundaki konumlar: aracın gidiş yönünü hareketinden anlamak için (hat sorgusundaki yön
       // bilgisi saatler önceye ait olabilir; araç son durakta dönünce eskir)
@@ -148,7 +150,8 @@ module.exports = async (req, res) => {
         if (o) { if (Math.abs(o.la - la) + Math.abs(o.lo - lo) > 0.002) { /* ~200 m: hat başında/mola yerinde dolanması hareket sayılmasın */ rec.pla = o.la; rec.plo = o.lo; rec.hm = Date.now(); }
                  else { if (o.pla) { rec.pla = o.pla; rec.plo = o.plo; } rec.hm = o.hm || 0; } }
         else rec.hm = rec.s > 3 ? Date.now() : 0;
-        (hatf[m.h] || (hatf[m.h] = [])).push(rec);
+        // Uygulamaya yalnız son 40 dk'da İETT'nin hat sorgusunda görülmüş araç (iz/ölçüm 6 saatlik eşleşmeyle devam eder)
+        if (Date.now() - m.t < 40 * 60000) (hatf[m.h] || (hatf[m.h] = [])).push(rec);
         if (olcSet.has(m.h)) iz.push([m.h, v.KapiNo, m.y, +la.toFixed(5), +lo.toFixed(5), Date.parse(ist + "T" + v.Saat + "+03:00")]);
       }
       const cmds = [["SET", "hiz", JSON.stringify({ t: Date.now(), cl: CELL_LAT, co: CELL_LON, g }), "EX", 1800],
